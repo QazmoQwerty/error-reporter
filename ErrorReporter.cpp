@@ -48,7 +48,7 @@ namespace ErrorReporter
         if (pos.file == NULL)
             return;
         for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
-        std::cout << color("┌─ ") << pos.file->getOriginalPath() << color(" ──") << "\n";
+        std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
 
         bool isFirst = true;
         uint lastLine = 0;
@@ -129,11 +129,10 @@ namespace ErrorReporter
         std::cout << line << "\n";
 
         sortSecondaries();
+
         for (auto note : notes)
         {
-            if (note.pos.file != pos.file)
-                note.show();
-            else if (note.pos.line == pos.line)
+            if (note.pos.line == pos.line)
             {
                 printIndent(maxLine);
                 for (uint i = 0; i < note.pos.startPos; i++)
@@ -176,6 +175,11 @@ namespace ErrorReporter
                 }
             }
         }
+        for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
+        std::cout << color("╯") << "\n";
+        for (auto note : notes)
+            if (note.pos.file != pos.file)
+                note.show();
     }
 
     void Error::showBasic(uint maxLine)
@@ -185,7 +189,7 @@ namespace ErrorReporter
         if (pos.file == NULL)
             return;
         for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
-        std::cout << color("┌─ ") << pos.file->getOriginalPath() << color(" ──") << "\n";
+        std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
 
         printIndent(maxLine);
         std::cout << "\n";
@@ -303,7 +307,8 @@ namespace ErrorReporter
                 }
             }
         }
-
+        for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
+        std::cout << color("╯") << "\n";
     }
 
     void Error::sortSecondaries()

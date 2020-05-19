@@ -22,6 +22,8 @@
 #define FBLK(x) string(KBLK) + x + RST
 
 #define BOLD(x) string("\x1B[1m") + x + RST
+#define WEAK(x) string("\x1B[2m") + x + RST
+#define ITLC(x) string("\x1B[3m") + x + RST
 #define UNDL(x) string("\x1B[4m") + x + RST
 
 #endif  /* _COLORS_ */
