@@ -1,25 +1,34 @@
 #include "ErrorReporter.h"
 
 int main() {
-    auto fl = new SourceFile("ErrorReporter.cpp");
-    ErrorReporter::Error(
-        "types don't match", 
-        "types don't match",
-        ErrorReporter::ERROR,
-        {11, 21, 23, fl}
-    ).withSecondary(
-        "right type is `long`",
-        {11, 24, 28, fl}
-    ).withSecondary(
-        "left type is `string`",
-        {11, 12, 20, fl}
-    ).withSecondary(
-        "look here",
-        {5, 12, 20, fl}
-    ).show();
-    // ErrorReporter::report("this is a warning", 1, {7, 12, 20, new SourceFile("ErrorReporter.cpp")});
-    // ErrorReporter::report("this is a note", 2, {4, 4, 20, new SourceFile("Main.cpp")});
-    // ErrorReporter::report("this is an error", 12, {20, 4, 6, new SourceFile("ErrorReporter.h")});
-    // ErrorReporter::showAll();
+    auto file1 = new SourceFile("Main.cpp");
+    ErrorReporter::report(ErrorReporter::Error(
+        "an error",
+        "a type",
+        ERR_GENERAL,
+        { 4, 4, 8, file1 }
+    ));
+    ErrorReporter::report(ErrorReporter::Error(
+        "a warning",
+        "a variable",
+        ERR_WARNING,
+        { 4, 9, 14, file1 }
+    ));
+    ErrorReporter::report(ErrorReporter::Error(
+        "a note",
+        "a string",
+        ERR_NOTE,
+        { 4, 32, 42, file1 }
+    ));
+
+    ErrorReporter::report(ErrorReporter::Error(
+        "a complex error",
+        "a variable",
+        ERR_GENERAL,
+        { 4, 9, 14, file1 })
+    .withSecondary("a relevant include", { 1, 0, 8, file1 })
+    .withSecondary("start of function `main`", { 3, 11, 12, file1 })
+    .withSecondary("a type", { 4, 4, 8, file1 })
+    .withSecondary("assignment", { 4, 15, 16, file1 }));
     return 0;
 }

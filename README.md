@@ -1,3 +1,5 @@
 # Error Reporter
 
-A simple interface for error diagnostics. Used for the Dino compiler.
+A simple implementation for pretty error diagnostics. Used for the Dino compiler.
+
+![](screenshot.png)
