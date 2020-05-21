@@ -11,13 +11,13 @@ void example1()
     ErrorReporter::report(ErrorReporter::Error(
         "a warning",
         "a variable",
-        ERR_WARNING,
+        WRN_GENERAL,
         { 4, 9, 13, file }
     ));
     ErrorReporter::report(ErrorReporter::Error(
         "a secondary",
         "a string",
-        ERR_NOTE,
+        NOTE_GENERAL,
         { 4, 31, 41, file }
     ));
 }
@@ -32,12 +32,62 @@ void example2()
             ERR_GENERAL,
             { 4, 9, 13, file }
         )
-        .withSecondary("a relevant include", { 1, 0, 8, file })
-        .withSecondary("start of function `main`", { 2, 15, 16, file })
-        .withSecondary("a type", { 4, 4, 8, file })
-        .withSecondary("assignment", { 4, 14, 15, file })
+        .withNote("a relevant include", { 1, 0, 8, file })
+        .withNote("curly brace!", { 3, 1, 2, file })
+        .withNote("a type", { 4, 4, 8, file })
+        .withNote("assignment", { 4, 14, 15, file })
+        .withNote("a variable", { 4, 9, 13, file })
+        .withNote("a string", { 4, 31, 41, file })
 
-        .withSecondary("relevant include in another file\nwith another line\nand another", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
+        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
+    );
+}
+
+void example3() 
+{
+    auto file = new SourceFile("Main.cpp");
+    ErrorReporter::report(
+        ErrorReporter::Error(
+            "a complex error",
+            "a variable",
+            ERR_GENERAL,
+            { 1, 9, 13, file }
+        )
+        .withNote("a relevant include", { 1, 0, 8, file })
+        .withNote("curly brace!", { 3, 1, 2, file })
+        .withNote("a type", { 4, 4, 8, file })
+        .withNote("assignment", { 4, 14, 15, file })
+        .withNote("a variable", { 4, 9, 13, file })
+        .withNote("a string", { 4, 31, 41, file })
+
+        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
+    );
+}
+
+void example4() 
+{
+    auto file = new SourceFile("Main.cpp");
+    auto file2 = new SourceFile("ErrorReporter.cpp");
+    ErrorReporter::report(
+        ErrorReporter::Error(
+            "a complex error",
+            "this is where the error is, hence the bold red",
+            ERR_GENERAL,
+            { 4, 9, 13, file }
+        )
+        .withHelp("a general help message,\nnot set to any specific position")
+        .withNote("can also be a note")
+
+        .withNote("a relevant include", { 1, 0, 8, file })
+        .withNote("curly brace!", { 3, 0, 1, file })
+        .withNote("a type", { 4, 4, 8, file })
+        .withNote("assignment", { 4, 14, 15, file })
+        .withNote("a variable with a very long explanation\nwhich requires an especially\nlarge number of lines", { 4, 9, 13, file })
+        .withHelp("a help message", { 4, 31, 41, file })
+
+        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, file2})
+
+        .withHelp("something important", {5, 4, 25, file2})
     );
 }
 
@@ -71,7 +121,8 @@ void helpExample()
 
 int main() {
     // helpExample();
-    example1();
-    example2();
+    // example1();
+    // example2();
+    example4();
     return 0;
 }

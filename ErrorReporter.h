@@ -14,6 +14,7 @@
 #include "SourceFile.h"
 // #include "llvm/Support/raw_ostream.h"
 
+
 using std::string;
 using std::exception;
 using std::vector;
@@ -26,10 +27,11 @@ using std::vector;
 
 enum ErrorCode {
     ERR_INTERNAL,
-    ERR_GENERAL = 1000,
-    ERR_WARNING = 2000,
-    ERR_NOTE    = 3000,
-    ERR_UNKNOWN = 4000,
+    ERR_GENERAL  = 1000,
+    WRN_GENERAL  = 2000,
+    NOTE_GENERAL = 3000,
+    HELP_GENERAL = 4000,
+    ERR_UNKNOWN  = 5000,
 };
 
 namespace ErrorReporter 
@@ -46,14 +48,15 @@ namespace ErrorReporter
 
     bool hasHelpArticle(ErrorCode errTy);
 
-    /* Represents dino compile time errors */
     class Error {
     public:
         Error(string message, ErrorCode type, Position position);
         Error(string message, string subMessage, ErrorCode type, Position position);
-        void show(unsigned int maxLine = 0);
-        Error& withSecondary(Error err);
-        Error& withSecondary(string message, Position position);
+        void show();
+        Error& withNote(string message, Position position);
+        Error& withHelp(string message, Position position);
+        Error& withNote(string message);
+        Error& withHelp(string message);
     private:
         string msg;
         string subMsg;
@@ -61,10 +64,10 @@ namespace ErrorReporter
         Position pos;
         vector<Error> secondaries;
 
-        void showBasic(unsigned int maxLine = 0);
         string tyToString();
         void sortSecondaries();
         string color(string str);
+        void showSecondariesOnLine(string &line, size_t &i, unsigned int maxLine);
         void printIndent(unsigned int maxLine, bool showBar = true);
         void printIndentWithLineNum(unsigned int maxLine, bool showBar = true);
         void printPaddingLine(unsigned int maxLine, unsigned int line = 0, SourceFile *file = NULL);
