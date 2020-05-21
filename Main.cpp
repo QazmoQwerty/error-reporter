@@ -12,13 +12,13 @@ void example1()
         "a warning",
         "a variable",
         ERR_WARNING,
-        { 4, 9, 14, file }
+        { 4, 9, 13, file }
     ));
     ErrorReporter::report(ErrorReporter::Error(
         "a note",
         "a string",
         ERR_NOTE,
-        { 4, 32, 42, file }
+        { 4, 31, 41, file }
     ));
 }
 
@@ -29,16 +29,16 @@ void example2()
         "a complex error",
         "a variable",
         ERR_GENERAL,
-        { 4, 8, 14, file })
+        { 4, 9, 13, file })
     .withSecondary("a relevant include", { 1, 0, 8, file })
     .withSecondary("start of function `main`", { 2, 15, 16, file })
     .withSecondary("a type", { 4, 4, 8, file })
-    .withSecondary("assignment", { 4, 15, 16, file }));
+    .withSecondary("assignment", { 4, 14, 15, file }));
 }
 
 void helpExample() 
 {
-    std::cout << BOLD("\nHelp for: \n\n    `") << BOLD(FYEL("Warning(E101): ")) << BOLD("line break negator `..` has no effect`\n\n");
+    std::cout << BOLD("\nHelp for: \n    `") << BOLD(FYEL("Warning(E101): ")) << BOLD("line break negator `..` has no effect`\n\n");
 
     std::cout << "The operator `..` causes the compiler to ignore any newlines occuring before or after the `..`.\n";
     std::cout << "This is used to split a single statement into multiple lines.\n\n";

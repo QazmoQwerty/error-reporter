@@ -332,7 +332,7 @@ namespace ErrorReporter
     {
         errors.push_back(err);
         err.show();
-        std::cout << "\n";
+        // std::cout << "\n";
         return errors.back();
     }
 
