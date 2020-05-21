@@ -35,33 +35,27 @@ namespace ErrorReporter
             if (secondary.pos.line > maxLine)
                 maxLine = secondary.pos.line;
 
-        bool errorOnTop = false;
-        
-        if (secondaries.size() == 0)
-            // errorOnTop = true;
-            return showBasic(maxLine);
+        sortSecondaries();
+        bool showAbove = false; // if there are any messages on the line of the error, point to the error from above instead
 
-        for (auto secondary : secondaries)
-            if (secondary.pos.file == pos.file && secondary.pos.line == pos.line)
-                goto normal;
+        for (size_t i = 0; !showAbove && i < secondaries.size(); i++)
+            if (secondaries[i].pos.file == pos.file && secondaries[i].pos.line == pos.line)
+                showAbove = true;  
 
-        showBasic(maxLine);
-        for (auto secondary : secondaries)
-            if (secondary.pos.file != pos.file)
-                secondary.show(maxLine);
-        return;
+        // show the main error message
+        if (msg != "")
+            std::cout << color(tyToString() + ": ") << BOLD(msg) << "\n";
 
-        normal:
+        if (pos.file == NULL) return;
 
-        std::cout << color(tyToString() + ": ") << BOLD(msg) << "\n";
-        if (pos.file == NULL)
-            return;
-        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
+
+        // print the file the error is in
+        printIndent(maxLine, false);
         std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
 
         bool isFirst = true;
         unsigned int lastLine = 0;
-        for (auto secondary : secondaries)
+        for (auto secondary : secondaries) // first show all messages in the main file which come before the error
         {
             if (secondary.pos.file == pos.file && secondary.pos.line < pos.line && secondary.msg == "")
             {
@@ -79,11 +73,14 @@ namespace ErrorReporter
                 }
                 lastLine = secondary.pos.line;
                 string line = getLine(pos.file->getOriginalPath(), secondary.pos.line);
+
                 auto tmp = secondary.errTy;
                 secondary.errTy = errTy;
-                secondary.printIndent(maxLine, true);
+                secondary.printIndentWithLineNum(maxLine);
                 secondary.errTy = tmp;
+
                 std::cout << line << "\n";
+
                 bool isFirstB = true;
                 for (auto currLine : splitLines(secondary.subMsg))
                 {
@@ -106,7 +103,12 @@ namespace ErrorReporter
 
         string line = getLine(pos.file->getOriginalPath(), pos.line);
 
-        if (lastLine != 0 && lastLine < pos.line - 1) 
+        if (isFirst)
+        {
+            printIndent(maxLine);
+            std::cout << "\n";
+        }
+        else if (lastLine != 0 && lastLine < pos.line - 1) 
         {
             if (lastLine == pos.line - 2)
                 printPaddingLine(maxLine, pos.line - 1, pos.file);
@@ -114,30 +116,50 @@ namespace ErrorReporter
         }
         lastLine = pos.line;
         
-        if (subMsg != "")
+        if (showAbove)
         {
-            for (auto currLine : splitLines(subMsg))
+            if (subMsg != "")
             {
-                printIndent(maxLine);
-                for (unsigned int i = 0; i < pos.startPos; i++)
-                    std::cout << (line[i] == '\t' ? "\t" : " ");
-                std::cout << color(currLine);
-                std::cout << "\n";
+                for (auto currLine : splitLines(subMsg))
+                {
+                    printIndent(maxLine);
+                    for (unsigned int i = 0; i < pos.startPos; i++)
+                        std::cout << (line[i] == '\t' ? "\t" : " ");
+                    std::cout << color(currLine);
+                    std::cout << "\n";
+                }
+            }
+            
+            printIndent(maxLine);
+
+            for (unsigned int i = 0; i < pos.startPos; i++)
+                std::cout << (line[i] == '\t' ? "\t" : " ");
+            for (unsigned int i = 0; i < pos.endPos - pos.startPos; i++)
+                std::cout << color("v");
+            std::cout << "\n";
+        }
+        
+        printIndentWithLineNum(maxLine);
+        std::cout << line << "\n";
+
+        if (!showAbove)
+        {
+            if (subMsg != "")
+            {
+                auto split = splitLines(subMsg);
+                for (int i = 0; i < split.size(); i++)
+                {
+                    printIndent(maxLine);
+                    for (unsigned int i = 0; i < pos.startPos; i++)
+                        std::cout << (line[i] == '\t' ? "\t" : " ");
+                    for (unsigned int j = 0; j < pos.endPos - pos.startPos; j++)
+                        std::cout << color(i == 0 ? "^" : " ");
+                    std::cout << " ";
+                    std::cout << color(split[i]) << "\n";
+                }
             }
         }
         
-        printIndent(maxLine);
-
-        for (unsigned int i = 0; i < pos.startPos; i++)
-            std::cout << (line[i] == '\t' ? "\t" : " ");
-        for (unsigned int i = 0; i < pos.endPos - pos.startPos; i++)
-            std::cout << color("v");
-        
-        std::cout << "\n";
-        printIndent(maxLine, true);
-        std::cout << line << "\n";
-
-        sortSecondaries();
 
         for (auto secondary : secondaries)
         {
@@ -162,7 +184,7 @@ namespace ErrorReporter
                 string line = getLine(pos.file->getOriginalPath(), secondary.pos.line);
                 auto tmp = secondary.errTy;
                 secondary.errTy = errTy;
-                secondary.printIndent(maxLine, true);
+                secondary.printIndentWithLineNum(maxLine);
                 secondary.errTy = tmp;
                 std::cout << line << "\n";
                 bool isFirst = true;
@@ -191,137 +213,6 @@ namespace ErrorReporter
                 secondary.show(maxLine);
     }
 
-
-
-    void Error::showBasic(unsigned int maxLine)
-    {
-        if (msg != "")
-            std::cout << color(tyToString() + ": ") << BOLD(msg) << "\n";
-        if (pos.file == NULL)
-            return;
-        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
-        std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
-
-        printIndent(maxLine);
-        std::cout << "\n";
-        unsigned int lastLine = 0;
-        for (auto secondary : secondaries)
-        {
-            if (secondary.pos.file == pos.file && secondary.pos.line < pos.line && secondary.msg == "")
-            {
-                if (lastLine != 0 && lastLine < secondary.pos.line - 1) 
-                {
-                    if (lastLine == secondary.pos.line - 2)
-                        printPaddingLine(maxLine, secondary.pos.line - 1, secondary.pos.file);
-                    else printPaddingLine(maxLine);
-                }
-                lastLine = secondary.pos.line;
-
-                string line = getLine(pos.file->getOriginalPath(), secondary.pos.line);
-                auto tmp = secondary.errTy;
-                secondary.errTy = errTy;
-                secondary.printIndent(maxLine, true);
-                secondary.errTy = tmp;
-                std::cout << line << "\n";
-                bool isFirst = true;
-                for (auto currLine : splitLines(secondary.subMsg))
-                {
-                    printIndent(maxLine);
-                    for (unsigned int i = 0; i < secondary.pos.startPos; i++)
-                        std::cout << (line[i] == '\t' ? "\t" : " ");
-                    
-                    if (isFirst)
-                    {
-                        for (unsigned int i = 0; i < secondary.pos.endPos - secondary.pos.startPos; i++)
-                            std::cout << secondary.color("^");
-                        std::cout << secondary.color(" ");
-                        isFirst = false;
-                    }
-                    std::cout << secondary.color(currLine);
-                    std::cout << "\n";
-                }
-            }
-        }
-        string line = getLine(pos.file->getOriginalPath(), pos.line);
-        if (lastLine != 0 && lastLine < pos.line - 1) 
-        {
-            if (lastLine == pos.line - 2)
-                printPaddingLine(maxLine, pos.line - 1, pos.file);
-            else printPaddingLine(maxLine);
-        }
-        lastLine = pos.line;
-        printIndent(maxLine, true);
-        std::cout << line << "\n";
-        printIndent(maxLine);
-        for (unsigned int i = 0; i < pos.startPos; i++)
-            std::cout << (line[i] == '\t' ? "\t" : " ");
-        for (unsigned int i = 0; i < pos.endPos - pos.startPos; i++)
-            std::cout << color("^");
-        
-        if (subMsg != "")
-        {
-            bool isFirst = true;
-            for (auto currLine : splitLines(subMsg))
-            {
-                if (isFirst)
-                {
-                    std::cout << " " << color(currLine);
-                    isFirst = false;
-                }
-                else
-                {
-                    std::cout << "\n";
-                    printIndent(maxLine);
-                    for (unsigned int i = 0; i < pos.startPos; i++)
-                        std::cout << (line[i] == '\t' ? "\t" : " ");
-                    std::cout << color(currLine);
-                }
-                
-            }
-            
-
-        }
-        std::cout << "\n";
-        for (auto secondary : secondaries)
-        {
-            if (secondary.pos.file == pos.file && secondary.pos.line > pos.line)
-            {
-                if (lastLine < secondary.pos.line - 1) 
-                {
-                    if (lastLine == secondary.pos.line - 2)
-                        printPaddingLine(maxLine, secondary.pos.line - 1, secondary.pos.file);
-                    else printPaddingLine(maxLine);
-                }
-                lastLine = secondary.pos.line;
-                string line = getLine(pos.file->getOriginalPath(), secondary.pos.line);
-                auto tmp = secondary.errTy;
-                secondary.errTy = errTy;
-                secondary.printIndent(maxLine, true);
-                secondary.errTy = tmp;
-                std::cout << line << "\n";
-                bool isFirst = true;
-                for (auto currLine : splitLines(secondary.subMsg))
-                {
-                    printIndent(maxLine);
-                    for (unsigned int i = 0; i < secondary.pos.startPos; i++)
-                        std::cout << (line[i] == '\t' ? "\t" : " ");
-                    
-                    if (isFirst)
-                    {
-                        for (unsigned int i = 0; i < secondary.pos.endPos - secondary.pos.startPos; i++)
-                            std::cout << secondary.color("^");
-                        std::cout << secondary.color(" ");
-                        isFirst = false;
-                    }
-                    std::cout << secondary.color(currLine);
-                    std::cout << "\n";
-                }
-            }
-        }
-        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
-        std::cout << color("╯") << "\n";
-    }
-
     void Error::sortSecondaries()
     {
         auto file = pos.file;
@@ -333,7 +224,9 @@ namespace ErrorReporter
                 if (a.pos.file != file && b.pos.file == file)
                     return false;
                 if (a.pos.file != b.pos.file)
-                    return a.pos.file->getOriginalPath() > b.pos.file->getOriginalPath();
+                    return a.pos.file->getOriginalPath() < b.pos.file->getOriginalPath();
+                if (a.pos.line > b.pos.line)
+                    return false;
                 return a.pos.startPos > b.pos.startPos; 
             }
         );
@@ -434,21 +327,23 @@ namespace ErrorReporter
         }
     }
 
-    void Error::printIndent(unsigned int maxLine, bool showLine) {
+    void Error::printIndent(unsigned int maxLine, bool showBar) 
+    {
+        for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++)
+            std::cout << " ";
+        if (showBar)
+            std::cout << color("│ ");
+    }
+
+    void Error::printIndentWithLineNum(unsigned int maxLine, bool showBar) 
+    {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
-        if (showLine)
-        {
-            auto str = " " + std::to_string(pos.line) + " ";
-            while (str.size() < targetSize)
-                str += " ";
-            std::cout << color(str);
-        }
-        else 
-        {
-            for (unsigned int i = 0; i < targetSize; i++)
-                std::cout << " ";
-        }
-        std::cout << color("│ ");
+        auto str = " " + std::to_string(pos.line) + " ";
+        while (str.size() < targetSize)
+            str += " ";
+        std::cout << color(str);
+        if (showBar)
+            std::cout << color("│ ");
     }
 
     string getLine(string fileName, int line)

@@ -65,7 +65,8 @@ namespace ErrorReporter
         string tyToString();
         void sortSecondaries();
         string color(string str);
-        void printIndent(unsigned int maxLine, bool showLine = false);
+        void printIndent(unsigned int maxLine, bool showBar = true);
+        void printIndentWithLineNum(unsigned int maxLine, bool showBar = true);
         void printPaddingLine(unsigned int maxLine, unsigned int line = 0, SourceFile *file = NULL);
     };
 

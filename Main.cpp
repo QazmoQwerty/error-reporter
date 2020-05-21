@@ -37,7 +37,7 @@ void example2()
         .withSecondary("a type", { 4, 4, 8, file })
         .withSecondary("assignment", { 4, 14, 15, file })
 
-        .withSecondary("relevant include in another file", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
+        .withSecondary("relevant include in another file\nwith another line\nand another", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
     );
 }
 
