@@ -49,25 +49,24 @@ namespace ErrorReporter
     /* Represents dino compile time errors */
     class Error {
     public:
+        Error(string message, ErrorCode type, Position position);
+        Error(string message, string subMessage, ErrorCode type, Position position);
+        void show(unsigned int maxLine = 0);
+        Error& withSecondary(Error err);
+        Error& withSecondary(string message, Position position);
+    private:
         string msg;
         string subMsg;
         ErrorCode errTy;
         Position pos;
-        vector<Error> notes;
+        vector<Error> secondaries;
 
-        Error(string message, ErrorCode type, Position position) : msg(message), subMsg(), errTy(type), pos(position) {};
-        Error(string message, string subMessage, ErrorCode type, Position position) : msg(message), subMsg(subMessage), errTy(type), pos(position) {};
-        void addNote(Error note) { notes.push_back(note); }
-        void show(unsigned int maxLine = 0);
         void showBasic(unsigned int maxLine = 0);
         string tyToString();
         void sortSecondaries();
         string color(string str);
         void printIndent(unsigned int maxLine, bool showLine = false);
         void printPaddingLine(unsigned int maxLine, unsigned int line = 0, SourceFile *file = NULL);
-
-        Error& withSecondary(Error err) { notes.push_back(err); return *this; }
-        Error& withSecondary(string message, Position position) { notes.push_back(Error("", message, ERR_NOTE, position)); return *this; }
     };
 
     /*
