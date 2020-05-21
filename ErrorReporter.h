@@ -38,9 +38,9 @@ namespace ErrorReporter
     class Position 
     {
     public:
-        uint line;
-        uint startPos;
-        uint endPos;
+        unsigned int line;
+        unsigned int startPos;
+        unsigned int endPos;
         SourceFile* file;
     };
 
@@ -58,13 +58,13 @@ namespace ErrorReporter
         Error(string message, ErrorCode type, Position position) : msg(message), subMsg(), errTy(type), pos(position) {};
         Error(string message, string subMessage, ErrorCode type, Position position) : msg(message), subMsg(subMessage), errTy(type), pos(position) {};
         void addNote(Error note) { notes.push_back(note); }
-        void show(uint maxLine = 0);
-        void showBasic(uint maxLine = 0);
+        void show(unsigned int maxLine = 0);
+        void showBasic(unsigned int maxLine = 0);
         string tyToString();
         void sortSecondaries();
         string color(string str);
-        void printIndent(uint maxLine, bool showLine = false);
-        void printPaddingLine(uint maxLine, uint line = 0, SourceFile *file = NULL);
+        void printIndent(unsigned int maxLine, bool showLine = false);
+        void printPaddingLine(unsigned int maxLine, unsigned int line = 0, SourceFile *file = NULL);
 
         Error& withSecondary(Error err) { notes.push_back(err); return *this; }
         Error& withSecondary(string message, Position position) { notes.push_back(Error("", message, ERR_NOTE, position)); return *this; }

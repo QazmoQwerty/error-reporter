@@ -20,7 +20,7 @@ namespace ErrorReporter
         return strings;
     }
 
-    void Error::show(uint maxLine)
+    void Error::show(unsigned int maxLine)
     {
         if (pos.line > maxLine)
             maxLine = pos.line;
@@ -47,11 +47,11 @@ namespace ErrorReporter
         std::cout << color(tyToString() + ": ") << BOLD(msg) << "\n";
         if (pos.file == NULL)
             return;
-        for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
+        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
         std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
 
         bool isFirst = true;
-        uint lastLine = 0;
+        unsigned int lastLine = 0;
         for (auto note : notes)
         {
             if (note.pos.file == pos.file && note.pos.line < pos.line && note.msg == "")
@@ -79,12 +79,12 @@ namespace ErrorReporter
                 for (auto currLine : splitLines(note.subMsg))
                 {
                     printIndent(maxLine);
-                    for (uint i = 0; i < note.pos.startPos; i++)
+                    for (unsigned int i = 0; i < note.pos.startPos; i++)
                         std::cout << (line[i] == '\t' ? "\t" : " ");
                     
                     if (isFirstB)
                     {
-                        for (uint i = 0; i < note.pos.endPos - note.pos.startPos; i++)
+                        for (unsigned int i = 0; i < note.pos.endPos - note.pos.startPos; i++)
                             std::cout << note.color("^");
                         std::cout << note.color(" ");
                         isFirstB = false;
@@ -110,7 +110,7 @@ namespace ErrorReporter
             for (auto currLine : splitLines(subMsg))
             {
                 printIndent(maxLine);
-                for (uint i = 0; i < pos.startPos; i++)
+                for (unsigned int i = 0; i < pos.startPos; i++)
                     std::cout << (line[i] == '\t' ? "\t" : " ");
                 std::cout << color(currLine);
                 std::cout << "\n";
@@ -119,9 +119,9 @@ namespace ErrorReporter
         
         printIndent(maxLine);
 
-        for (uint i = 0; i < pos.startPos; i++)
+        for (unsigned int i = 0; i < pos.startPos; i++)
             std::cout << (line[i] == '\t' ? "\t" : " ");
-        for (uint i = 0; i < pos.endPos - pos.startPos; i++)
+        for (unsigned int i = 0; i < pos.endPos - pos.startPos; i++)
             std::cout << color("v");
         
         std::cout << "\n";
@@ -135,9 +135,9 @@ namespace ErrorReporter
             if (note.pos.line == pos.line)
             {
                 printIndent(maxLine);
-                for (uint i = 0; i < note.pos.startPos; i++)
+                for (unsigned int i = 0; i < note.pos.startPos; i++)
                     std::cout << (line[i] == '\t' ? "\t" : " ");
-                for (uint i = 0; i < note.pos.endPos - note.pos.startPos; i++)
+                for (unsigned int i = 0; i < note.pos.endPos - note.pos.startPos; i++)
                     std::cout << note.color("^");
                 std::cout << " " << note.color(note.subMsg) << "\n";
             }
@@ -160,12 +160,12 @@ namespace ErrorReporter
                 for (auto currLine : splitLines(note.subMsg))
                 {
                     printIndent(maxLine);
-                    for (uint i = 0; i < note.pos.startPos; i++)
+                    for (unsigned int i = 0; i < note.pos.startPos; i++)
                         std::cout << (line[i] == '\t' ? "\t" : " ");
                     
                     if (isFirst)
                     {
-                        for (uint i = 0; i < note.pos.endPos - note.pos.startPos; i++)
+                        for (unsigned int i = 0; i < note.pos.endPos - note.pos.startPos; i++)
                             std::cout << note.color("^");
                         std::cout << note.color(" ");
                         isFirst = false;
@@ -175,25 +175,25 @@ namespace ErrorReporter
                 }
             }
         }
-        for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
+        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
         std::cout << color("╯") << "\n";
         for (auto note : notes)
             if (note.pos.file != pos.file)
                 note.show();
     }
 
-    void Error::showBasic(uint maxLine)
+    void Error::showBasic(unsigned int maxLine)
     {
         if (msg != "")
             std::cout << color(tyToString() + ": ") << BOLD(msg) << "\n";
         if (pos.file == NULL)
             return;
-        for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
+        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << " ";
         std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
 
         printIndent(maxLine);
         std::cout << "\n";
-        uint lastLine = 0;
+        unsigned int lastLine = 0;
         for (auto note : notes)
         {
             if (note.pos.file == pos.file && note.pos.line < pos.line && note.msg == "")
@@ -216,12 +216,12 @@ namespace ErrorReporter
                 for (auto currLine : splitLines(note.subMsg))
                 {
                     printIndent(maxLine);
-                    for (uint i = 0; i < note.pos.startPos; i++)
+                    for (unsigned int i = 0; i < note.pos.startPos; i++)
                         std::cout << (line[i] == '\t' ? "\t" : " ");
                     
                     if (isFirst)
                     {
-                        for (uint i = 0; i < note.pos.endPos - note.pos.startPos; i++)
+                        for (unsigned int i = 0; i < note.pos.endPos - note.pos.startPos; i++)
                             std::cout << note.color("^");
                         std::cout << note.color(" ");
                         isFirst = false;
@@ -242,9 +242,9 @@ namespace ErrorReporter
         printIndent(maxLine, true);
         std::cout << line << "\n";
         printIndent(maxLine);
-        for (uint i = 0; i < pos.startPos; i++)
+        for (unsigned int i = 0; i < pos.startPos; i++)
             std::cout << (line[i] == '\t' ? "\t" : " ");
-        for (uint i = 0; i < pos.endPos - pos.startPos; i++)
+        for (unsigned int i = 0; i < pos.endPos - pos.startPos; i++)
             std::cout << color("^");
         
         if (subMsg != "")
@@ -261,7 +261,7 @@ namespace ErrorReporter
                 {
                     std::cout << "\n";
                     printIndent(maxLine);
-                    for (uint i = 0; i < pos.startPos; i++)
+                    for (unsigned int i = 0; i < pos.startPos; i++)
                         std::cout << (line[i] == '\t' ? "\t" : " ");
                     std::cout << color(currLine);
                 }
@@ -292,12 +292,12 @@ namespace ErrorReporter
                 for (auto currLine : splitLines(note.subMsg))
                 {
                     printIndent(maxLine);
-                    for (uint i = 0; i < note.pos.startPos; i++)
+                    for (unsigned int i = 0; i < note.pos.startPos; i++)
                         std::cout << (line[i] == '\t' ? "\t" : " ");
                     
                     if (isFirst)
                     {
-                        for (uint i = 0; i < note.pos.endPos - note.pos.startPos; i++)
+                        for (unsigned int i = 0; i < note.pos.endPos - note.pos.startPos; i++)
                             std::cout << note.color("^");
                         std::cout << note.color(" ");
                         isFirst = false;
@@ -307,7 +307,7 @@ namespace ErrorReporter
                 }
             }
         }
-        for (uint i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
+        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
         std::cout << color("╯") << "\n";
     }
 
@@ -362,7 +362,7 @@ namespace ErrorReporter
 
     void showAll() 
     {
-        for (uint i = 0; i < errors.size(); i++)
+        for (unsigned int i = 0; i < errors.size(); i++)
         {
             if (i) std::cout << "\n";
             errors[i].show();
@@ -396,9 +396,9 @@ namespace ErrorReporter
         }
     }
 
-    void Error::printPaddingLine(uint maxLine, uint line, SourceFile *file) 
+    void Error::printPaddingLine(unsigned int maxLine, unsigned int line, SourceFile *file) 
     {
-        uint targetSize = std::to_string(maxLine).size() + 2;
+        unsigned int targetSize = std::to_string(maxLine).size() + 2;
         if (line == 0)
         {
             switch (targetSize)
@@ -421,8 +421,8 @@ namespace ErrorReporter
         }
     }
 
-    void Error::printIndent(uint maxLine, bool showLine) {
-        uint targetSize = std::to_string(maxLine).size() + 2;
+    void Error::printIndent(unsigned int maxLine, bool showLine) {
+        unsigned int targetSize = std::to_string(maxLine).size() + 2;
         if (showLine)
         {
             auto str = " " + std::to_string(pos.line) + " ";
@@ -432,7 +432,7 @@ namespace ErrorReporter
         }
         else 
         {
-            for (uint i = 0; i < targetSize; i++)
+            for (unsigned int i = 0; i < targetSize; i++)
                 std::cout << " ";
         }
         std::cout << color("│ ");
