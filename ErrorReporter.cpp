@@ -191,12 +191,12 @@ namespace ErrorReporter
             printIndent(maxLine, false);
             std::cout << secondary.color("• " + secondary.tyToString() + secondary.color(": "));
             auto lines = splitLines(secondary.subMsg);
-            for (uint idx = 0; idx < lines.size(); idx++)
+            for (size_t idx = 0; idx < lines.size(); idx++)
             {
                 if (idx != 0)
                 {
                     printIndent(maxLine, false);
-                    for (uint j = 0; j < secondary.tyToString().size() + 4; j++)
+                    for (size_t j = 0; j < secondary.tyToString().size() + 4; j++)
                         std::cout << " ";
                 }
                 std::cout << lines[idx] << "\n";

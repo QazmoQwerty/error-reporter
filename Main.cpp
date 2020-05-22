@@ -15,7 +15,13 @@ void example1()
         { 4, 9, 13, file }
     ));
     ErrorReporter::report(ErrorReporter::Error(
-        "a secondary",
+        "some help",
+        "a type",
+        HELP_GENERAL,
+        { 4, 4, 8, file }
+    ));
+    ErrorReporter::report(ErrorReporter::Error(
+        "a note",
         "a string",
         NOTE_GENERAL,
         { 4, 31, 41, file }
@@ -75,19 +81,18 @@ void example4()
             ERR_GENERAL,
             { 4, 9, 13, file }
         )
-        .withHelp("a general help message,\nnot set to any specific position")
-        .withNote("can also be a note")
-
+        
         .withNote("a relevant include", { 1, 0, 8, file })
         .withNote("curly brace!", { 3, 0, 1, file })
         .withNote("a type", { 4, 4, 8, file })
         .withNote("assignment", { 4, 14, 15, file })
         .withNote("a variable with a very long explanation\nwhich requires an especially\nlarge number of lines", { 4, 9, 13, file })
         .withHelp("a help message", { 4, 31, 41, file })
-
         .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, file2})
-
         .withHelp("something important", {5, 4, 25, file2})
+
+        .withHelp("a general help message,\nnot set to any specific position")
+        .withNote("can also be a note")
     );
 }
 
@@ -121,8 +126,11 @@ void helpExample()
 
 int main() {
     // helpExample();
-    // example1();
+    std::cout << "\n";
+    example1();
+    std::cout << "\n";
     // example2();
     example4();
+    std::cout << "\n";
     return 0;
 }
