@@ -1,9 +1,8 @@
 #include "ErrorReporter.h"
-
+#include "TerminalColors.h"
 
 namespace ErrorReporter 
 {
-
     Error::Error(string message, ErrorCode type, Position position) : msg(message), subMsg(), errTy(type), pos(position) {};
     Error::Error(string message, string subMessage, ErrorCode type, Position position) : msg(message), subMsg(subMessage), errTy(type), pos(position) {};
     Error& Error::withNote(string message, Position position) { secondaries.push_back(Error("", message, NOTE_GENERAL, position)); return *this; }
@@ -53,7 +52,7 @@ namespace ErrorReporter
 
         // print the file the error is in
         printIndent(maxLine, false);
-        std::cout << color("╭─ ") << pos.file->getOriginalPath() << color(" ─╴") << "\n";
+        std::cout << color("╭─ ") << pos.file->str() << color(" ─╴") << "\n";
 
         bool isFirst = true;
         unsigned int lastLine = 0;
@@ -77,7 +76,7 @@ namespace ErrorReporter
                 else printPaddingLine(maxLine);
             }
             lastLine = secondary.pos.line;
-            string line = getLine(pos.file->getOriginalPath(), secondary.pos.line);
+            string line = getLine(pos.file->str(), secondary.pos.line);
 
             auto tmp = secondary.errTy;
             secondary.errTy = errTy;
@@ -89,7 +88,7 @@ namespace ErrorReporter
             showSecondariesOnLine(line, i, maxLine);
         }
 
-        string line = getLine(pos.file->getOriginalPath(), pos.line);
+        string line = getLine(pos.file->str(), pos.line);
 
         if (isFirst)
         {
@@ -156,13 +155,13 @@ namespace ErrorReporter
         {
             auto &secondary = secondaries[i];
 
-            if (secondary.pos.file->getOriginalPath() != currFile->getOriginalPath())
+            if (secondary.pos.file->str() != currFile->str())
             {
                 currFile = secondary.pos.file;
                 for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
                 std::cout << color("╯") << "\n";
                 printIndent(maxLine, false);
-                std::cout << color("╭─ ") << currFile->getOriginalPath() << color(" ─╴") << "\n";
+                std::cout << color("╭─ ") << currFile->str() << color(" ─╴") << "\n";
                 printIndent(maxLine);
                 std::cout << "\n";
             }
@@ -174,7 +173,7 @@ namespace ErrorReporter
                 else printPaddingLine(maxLine);
             }
             lastLine = secondary.pos.line;
-            string line = getLine(pos.file->getOriginalPath(), secondary.pos.line);
+            string line = getLine(pos.file->str(), secondary.pos.line);
             auto tmp = secondary.errTy;
             secondary.errTy = errTy;
             secondary.printIndentWithLineNum(maxLine);
@@ -300,7 +299,7 @@ namespace ErrorReporter
                 if (a.pos.file != file && b.pos.file == file)
                     return false;
                 if (a.pos.file != b.pos.file)
-                    return a.pos.file->getOriginalPath() < b.pos.file->getOriginalPath();
+                    return a.pos.file->str() < b.pos.file->str();
                 if (a.pos.line > b.pos.line)
                     return false;
                 return a.pos.startPos > b.pos.startPos; 
@@ -400,7 +399,7 @@ namespace ErrorReporter
                 str += " ";
             str += "│ ";
             std::cout << color(str);
-            if (file) std::cout << getLine(file->getOriginalPath(), line);
+            if (file) std::cout << getLine(file->str(), line);
             std::cout << "\n";
         }
     }

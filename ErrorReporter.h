@@ -10,11 +10,6 @@
 #include <functional>
 #include <algorithm>
 
-#include "TerminalColors.h"
-#include "SourceFile.h"
-// #include "llvm/Support/raw_ostream.h"
-
-
 using std::string;
 using std::exception;
 using std::vector;
@@ -36,6 +31,18 @@ enum ErrorCode {
 
 namespace ErrorReporter 
 {
+    class SourceFile {
+        public: virtual string str() = 0;
+    };
+
+    class SimpleFile : public SourceFile {
+    private:
+        string _path;
+    public:     
+        SimpleFile(string path) : _path(path) {};
+        string str() { return _path; };
+    };
+
     /* Basic information about the position of a token or node */
     class Position 
     {

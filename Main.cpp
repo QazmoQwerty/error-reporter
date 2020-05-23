@@ -1,7 +1,8 @@
 #include "ErrorReporter.h"
+
 void example1() 
 {
-    auto file = new SourceFile("Main.cpp");
+    auto file = new ErrorReporter::SimpleFile("Main.cpp");
     ErrorReporter::report(ErrorReporter::Error(
         "an error",
         "a type",
@@ -13,6 +14,12 @@ void example1()
         "a variable",
         WRN_GENERAL,
         { 4, 9, 13, file }
+    )/*.withHelp("this is a message")*/);
+    ErrorReporter::report(ErrorReporter::Error(
+        "a note",
+        "a string",
+        NOTE_GENERAL,
+        { 4, 31, 41, file }
     ));
     ErrorReporter::report(ErrorReporter::Error(
         "some help",
@@ -20,17 +27,11 @@ void example1()
         HELP_GENERAL,
         { 4, 4, 8, file }
     ));
-    ErrorReporter::report(ErrorReporter::Error(
-        "a note",
-        "a string",
-        NOTE_GENERAL,
-        { 4, 31, 41, file }
-    ));
 }
 
 void example2() 
 {
-    auto file = new SourceFile("Main.cpp");
+    auto file = new ErrorReporter::SimpleFile("Main.cpp");
     ErrorReporter::report(
         ErrorReporter::Error(
             "a complex error",
@@ -45,13 +46,13 @@ void example2()
         .withNote("a variable", { 4, 9, 13, file })
         .withNote("a string", { 4, 31, 41, file })
 
-        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
+        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, new ErrorReporter::SimpleFile("ErrorReporter.cpp")})
     );
 }
 
 void example3() 
 {
-    auto file = new SourceFile("Main.cpp");
+    auto file = new ErrorReporter::SimpleFile("Main.cpp");
     ErrorReporter::report(
         ErrorReporter::Error(
             "a complex error",
@@ -66,14 +67,14 @@ void example3()
         .withNote("a variable", { 4, 9, 13, file })
         .withNote("a string", { 4, 31, 41, file })
 
-        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, new SourceFile("ErrorReporter.cpp")})
+        .withNote("relevant include in another file\nwith another line\nand another", {1, 0, 8, new ErrorReporter::SimpleFile("ErrorReporter.cpp")})
     );
 }
 
 void example4() 
 {
-    auto file = new SourceFile("Main.cpp");
-    auto file2 = new SourceFile("ErrorReporter.cpp");
+    auto file = new ErrorReporter::SimpleFile("Main.cpp");
+    auto file2 = new ErrorReporter::SimpleFile("ErrorReporter.cpp");
     ErrorReporter::report(
         ErrorReporter::Error(
             "a complex error",
@@ -98,6 +99,7 @@ void example4()
 
 void helpExample() 
 {
+    #include "TerminalColors.h"
     std::cout << BOLD("\nHelp for: \n    `")
               << BOLD(FYEL("Warning(E101): ")) << BOLD("line break negator `..` has no effect`\n\n")
               << "The operator `..` causes the compiler to ignore any newlines occuring before or after the `..`.\n"
