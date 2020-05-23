@@ -1,7 +1,6 @@
 #include "ErrorReporter.h"
 
-void example1() 
-{
+void example1() {
     auto file = new ErrorReporter::SimpleFile("Main.cpp");
     ErrorReporter::report(ErrorReporter::Error(
         "an error",
@@ -29,8 +28,7 @@ void example1()
     ));
 }
 
-void example2() 
-{
+void example2() {
     auto file = new ErrorReporter::SimpleFile("Main.cpp");
     ErrorReporter::report(
         ErrorReporter::Error(
@@ -50,8 +48,7 @@ void example2()
     );
 }
 
-void example3() 
-{
+void example3() {
     auto file = new ErrorReporter::SimpleFile("Main.cpp");
     ErrorReporter::report(
         ErrorReporter::Error(
@@ -71,8 +68,7 @@ void example3()
     );
 }
 
-void example4() 
-{
+void example4() {
     auto file = new ErrorReporter::SimpleFile("Main.cpp");
     auto file2 = new ErrorReporter::SimpleFile("ErrorReporter.cpp");
     ErrorReporter::report(
@@ -84,7 +80,8 @@ void example4()
         )
         
         .withNote("a relevant include", { 1, 0, 8, file })
-        .withNote("curly brace!", { 3, 0, 1, file })
+        .withNote("curly brace", { 3, 16, 17, file })
+        .withNote("another curly brace", { 15, 8, 1, file })
         .withNote("a type", { 4, 4, 8, file })
         .withNote("assignment", { 4, 14, 15, file })
         .withNote("a variable with a very long explanation\nwhich requires an especially\nlarge number of lines", { 4, 9, 13, file })
@@ -97,8 +94,7 @@ void example4()
     );
 }
 
-void helpExample() 
-{
+void helpExample() {
     #include "TerminalColors.h"
     std::cout << BOLD("\nHelp for: \n    `")
               << BOLD(FYEL("Warning(E101): ")) << BOLD("line break negator `..` has no effect`\n\n")

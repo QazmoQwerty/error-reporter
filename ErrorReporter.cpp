@@ -39,14 +39,21 @@ namespace ErrorReporter {
     Error& report(string msg, ErrorCode errCode, Position pos)                { return report(Error(msg, errCode, pos));         }
     Error& report(string msg, string subMsg, ErrorCode errCode, Position pos) { return report(Error(msg, subMsg, errCode, pos)); }
 
-    Error::Error(string message, ErrorCode type, Position position) : msg(message), subMsg(), errTy(type), pos(position) {};
-    Error::Error(string message, string subMessage, ErrorCode type, Position position) : msg(message), subMsg(subMessage), errTy(type), pos(position) {};
+    Error::Error(string message,  string subMessage, ErrorCode type, Position position) 
+                  : msg(message), subMsg(subMessage),    errTy(type),     pos(position) {
+        if (pos.start >= pos.end)
+            pos.end = pos.start + 1;
+    };
+
+    Error::Error(string message, ErrorCode type, Position position) : Error(message, "", type, position) {};
 
     Error& Error::withNote(string message, Position position) { secondaries.push_back(Error("", message, NOTE_GENERAL, position)); return *this; }
     Error& Error::withHelp(string message, Position position) { secondaries.push_back(Error("", message, HELP_GENERAL, position)); return *this; }
 
     Error& Error::withNote(string message) { return withNote(message, POS_NONE); }
     Error& Error::withHelp(string message) { return withHelp(message, POS_NONE); }
+
+    #define ON_SAME_LINE(a, b) ((a).pos.file == (b).pos.file && (a).pos.line == (b).pos.line)
 
     void Error::show() {
         // find the maximum line (to know by how much to indent the bars)
@@ -56,11 +63,11 @@ namespace ErrorReporter {
                 maxLine = secondary.pos.line;
 
         sortSecondaries();
-        bool showAbove = false; // if theERR_UNKNOWNre are any messages on the line of the error, point to the error from above instead
+        bool showAbove = false; // if there are any messages on the line of the error, point to the error from above instead
 
         for (size_t i = 0; !showAbove && i < secondaries.size(); i++)
-            if (secondaries[i].pos.file == pos.file && secondaries[i].pos.line == pos.line)
-                showAbove = true;  
+            if (ON_SAME_LINE(secondaries[i], *this))
+                showAbove = true;
 
         // show the main error message
         if (msg != "")
@@ -105,7 +112,7 @@ namespace ErrorReporter {
 
         string line = getLine(pos.file->str(), pos.line);
 
-        if (isFirst) {
+        if (isFirst && !showAbove) {
             printIndent(maxLine);
             std::cout << "\n";
         } else if (lastLine != 0 && lastLine < pos.line - 1) {
@@ -151,7 +158,7 @@ namespace ErrorReporter {
             }
         }
       
-        if (i < secondaries.size() && secondaries[i].pos.file == pos.file && secondaries[i].pos.line == pos.line)
+        if (i < secondaries.size() && ON_SAME_LINE(secondaries[i], *this))
             showSecondariesOnLine(line, i, maxLine);
         
         auto currFile = pos.file;
@@ -160,7 +167,7 @@ namespace ErrorReporter {
 
             if (secondary.pos.file->str() != currFile->str()) {
                 currFile = secondary.pos.file;
-                for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
+                for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) std::cout << color("─");
                 std::cout << color("╯") << "\n";
                 printIndent(maxLine, false);
                 std::cout << color("╭─ ") << currFile->str() << color(" ─╴") << "\n";
@@ -183,7 +190,7 @@ namespace ErrorReporter {
             showSecondariesOnLine(line, i, maxLine);
         }
 
-        for (unsigned int i = 0; i < std::to_string(pos.line).size() + 2; i++) std::cout << color("─");
+        for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) std::cout << color("─");
         std::cout << color("╯") << "\n"; 
         for (; i < secondaries.size(); i++) {
             auto& secondary = secondaries[i];
@@ -201,10 +208,7 @@ namespace ErrorReporter {
         }
     }
 
-    #define ON_SAME_LINE(a, b) (a.pos.file == b.pos.file && a.pos.line == b.pos.line)
-
-    void Error::showSecondariesOnLine(string &line, size_t &i, unsigned int maxLine)
-    {
+    void Error::showSecondariesOnLine(string &line, size_t &i, unsigned int maxLine) {
         auto &first = secondaries[i];
         printIndent(maxLine);
         if (i + 1 >= secondaries.size() || !ON_SAME_LINE(first, secondaries[i + 1])) {
@@ -268,8 +272,7 @@ namespace ErrorReporter {
         }
     }
 
-    void Error::sortSecondaries()
-    {
+    void Error::sortSecondaries() {
         auto file = pos.file;
         std::sort(
             std::begin(secondaries), std::end(secondaries), 
@@ -291,8 +294,7 @@ namespace ErrorReporter {
         );
     }
 
-    string Error::tyToString() 
-    {
+    string Error::tyToString() {
         if (ERR_GENERAL < errTy && errTy < WRN_GENERAL)
             return "Error(E" + std::to_string(errTy).substr(1) + ")";
         else if (errTy == ERR_GENERAL)
@@ -312,8 +314,7 @@ namespace ErrorReporter {
         return "Internal Error";
     }
 
-    string Error::color(string str)
-    {
+    string Error::color(string str) {
         if (WRN_GENERAL <= errTy && errTy < NOTE_GENERAL)
             return BOLD(FYEL(str));
         if (NOTE_GENERAL <= errTy && errTy < HELP_GENERAL)
@@ -323,20 +324,15 @@ namespace ErrorReporter {
         return BOLD(FRED(str));
     }
 
-    void Error::printPaddingLine(unsigned int maxLine, unsigned int line, SourceFile *file) 
-    {
+    void Error::printPaddingLine(unsigned int maxLine, unsigned int line, SourceFile *file) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
-        if (line == 0)
-        {
-            switch (targetSize)
-            {
+        if (line == 0) {
+            switch (targetSize) {
                 case 3:  std::cout << " " << color("⋯") << "\n"; break;
                 case 4:  std::cout << " " << color("··") << "\n"; break;
                 default: std::cout << " " << color("···") << "\n"; break;
             }   
-        }
-        else
-        {
+        } else {
             auto str = " " + std::to_string(line) + " ";
             while (str.size() < targetSize)
                 str += " ";
@@ -347,16 +343,14 @@ namespace ErrorReporter {
         }
     }
 
-    void Error::printIndent(unsigned int maxLine, bool showBar) 
-    {
+    void Error::printIndent(unsigned int maxLine, bool showBar) {
         for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++)
             std::cout << " ";
         if (showBar)
             std::cout << color("│ ");
     }
 
-    void Error::printIndentWithLineNum(unsigned int maxLine, bool showBar) 
-    {
+    void Error::printIndentWithLineNum(unsigned int maxLine, bool showBar) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
         auto str = " " + std::to_string(pos.line) + " ";
         while (str.size() < targetSize)
