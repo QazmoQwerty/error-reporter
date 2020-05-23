@@ -14,12 +14,6 @@ using std::string;
 using std::exception;
 using std::vector;
 
-#define FATAL_ERROR(_string) throw ErrorReporter::reportInternal(std::string(_string) + " at " + __func__ + ":" + std::to_string(__LINE__) + " in " + __FILE__)
-
-#define TODO FATAL_ERROR("TODO reached");
-#define UNREACHABLE FATAL_ERROR("unreachable reached");
-#define ASSERT(cond) if(!(cond)) FATAL_ERROR("assertion failed")
-
 enum ErrorCode {
     ERR_INTERNAL,
     ERR_GENERAL  = 1000,
@@ -29,12 +23,16 @@ enum ErrorCode {
     ERR_UNKNOWN  = 5000,
 };
 
-namespace ErrorReporter 
-{
+namespace ErrorReporter {
+
     class SourceFile {
-        public: virtual string str() = 0;
+    public: 
+        virtual string str() = 0;
     };
 
+    /*
+        A minimal SourceFile class to get you started
+    */
     class SimpleFile : public SourceFile {
     private:
         string _path;
@@ -43,17 +41,21 @@ namespace ErrorReporter
         string str() { return _path; };
     };
 
-    /* Basic information about the position of a token or node */
-    class Position 
-    {
+    /* 
+        Basic information about the position of a token or node 
+
+        example: { line=2, start=2, end=5 }
+        means:   "on second line, from the 3rd character to (and excluding) the 6th character"
+    */
+    class Position {
     public:
         unsigned int line;
-        unsigned int startPos;
-        unsigned int endPos;
+        unsigned int start;
+        unsigned int end;
         SourceFile* file;
     };
 
-    bool hasHelpArticle(ErrorCode errTy);
+    // bool hasHelpArticle(ErrorCode errTy);
 
     class Error {
     public:
@@ -85,14 +87,11 @@ namespace ErrorReporter
         Any compile errors/warnings found will be reported here.
     */
     extern vector<Error> errors;
-    string getLine(string fileName, int line);
+
     const Position POS_NONE = {0, 0, 0, NULL};
 
     /* Pretty-prints all errors reported so far */
     void showAll();
-
-    /* Pretty-prints an Error. */
-    void show(Error &err);
 
     /* 
         Create and save an error/warning.
@@ -101,10 +100,4 @@ namespace ErrorReporter
     Error& report(Error err);
     Error& report(string msg, ErrorCode errCode, Position pos);
     Error& report(string msg, string subMsg, ErrorCode errCode, Position pos);
-    void reportAbort();
-
-    /*
-        Report an ERR_INTERNAL error - these should never be shown to a user of the compiler (in theory at least).
-    */
-    Error& reportInternal(string msg, ErrorCode errCode = ERR_INTERNAL, Position pos = POS_NONE);
 }
