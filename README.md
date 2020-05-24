@@ -1,6 +1,8 @@
 # Diagnostic Reporter
 
-A simple implementation for pretty error diagnostics. Used for the Dino compiler.
+A simple implementation for pretty, Rust-style error diagnostics.
+
+Used for the Dino compiler.
 
 ![](example.png)
 

@@ -489,9 +489,7 @@ namespace reporter {
                 out << color("╭─ ") << currFile->str() << color(" ─╴") << "\n";
                 printIndent(out, maxLine);
                 out << "\n";
-            }
-
-            if (lastLine == secondary.loc.line - 2)
+            } else if (lastLine == secondary.loc.line - 2)
                 printPaddingLine(out, maxLine, secondary.loc.line - 1, secondary.loc.file);
             else if (lastLine < secondary.loc.line - 1)
                 printPaddingLine(out, maxLine);
@@ -524,6 +522,7 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
+    /* show all the secondary messages on the current line */
     void Diagnostic::showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine) {
         auto &first = secondaries[i];
         printIndent(out, maxLine);
@@ -590,6 +589,7 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
+    /* sort the vector of secondary messages based on the order we want to be printing them */
     void Diagnostic::sortSecondaries() {
         auto file = loc.file;
         std::sort(
@@ -614,6 +614,7 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
+    /* a 'padding' line is an irrelevant line in between two other relevant lines */
     void Diagnostic::printPaddingLine(std::ostream& out, unsigned int maxLine, unsigned int line, SourceFile *file) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
         if (line == 0) {
@@ -633,8 +634,7 @@ namespace reporter {
         }
     }
 
-    /////////////////////////////////////////////////////////////////////////
-
+    /* prints the bars on the left with the correct indentation */
     void Diagnostic::printIndent(std::ostream& out, unsigned int maxLine, bool showBar) {
         for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++)
             out << " ";
@@ -644,6 +644,7 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
+    /* prints the bars on the left with the correct indentation + with the line number */
     void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
         auto str = " " + std::to_string(lineNum) + " ";
@@ -654,8 +655,7 @@ namespace reporter {
             out << color("│ ");
     }
 
-    /////////////////////////////////////////////////////////////////////////
-
+    /* prints the bars on the left with the correct indentation + with the line number */
     void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int maxLine, bool showBar) {
         printIndentWithLineNum(out, loc.line, maxLine, showBar);
     }
@@ -672,8 +672,6 @@ namespace reporter {
             default:      return code == "" ? "Internal Error" : "Internal Error(" + code + ")";
         }
     }
-
-    /////////////////////////////////////////////////////////////////////////
 
     std::string Diagnostic::color(std::string str) {
         switch (errTy) {
