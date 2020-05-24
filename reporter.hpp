@@ -133,10 +133,6 @@ namespace reporter {
         Error& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
         Error& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
         Error& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-
-    private:
-        std::string tyToString() { return code == "" ? "Error" : "Error(" + code + ")"; }
-        std::string color(std::string str) { return colors::bold(colors::red(str)); }
     };
 
     class Warning : public Diagnostic {
@@ -151,9 +147,6 @@ namespace reporter {
         Warning& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
         Warning& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
         Warning& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-    private:
-        std::string tyToString() { return code == "" ? "Warning" : "Warning(" + code + ")"; }
-        std::string color(std::string str) { return colors::bold(colors::yellow(str)); }
     };
 
     class Note : public Diagnostic {
@@ -168,9 +161,6 @@ namespace reporter {
         Note& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
         Note& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
         Note& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-    private:
-        std::string tyToString() { return code == "" ? "Note" : "Note(" + code + ")"; }
-        std::string color(std::string str) { return colors::bold(colors::black(str)); }
     };
 
     class Help : public Diagnostic {
@@ -185,9 +175,6 @@ namespace reporter {
         Help& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
         Help& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
         Help& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-    private:
-        std::string tyToString() { return code == "" ? "Help" : "Help(" + code + ")"; }
-        std::string color(std::string str) { return colors::bold(colors::blue(str)); }
     };
 
     /******************** implementations ********************/
@@ -480,7 +467,7 @@ namespace reporter {
 
     void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
-        auto str = " " + std::to_string(pos.line) + " ";
+        auto str = " " + std::to_string(lineNum) + " ";
         while (str.size() < targetSize)
             str += " ";
         out << color(str);
