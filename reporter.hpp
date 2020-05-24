@@ -121,61 +121,24 @@ namespace reporter {
         Diagnostic& withHelp(std::string message);
     };
 
-    class Error : public Diagnostic {
+    template<ErrorCode T>
+    class DiagnosticTy : public Diagnostic {
     public:
-        Error(std::string message)                                                              : Diagnostic(ERROR, message) {}
-        Error(std::string message, Position position)                                           : Diagnostic(ERROR, message, position) {}
-        Error(std::string message, std::string subMessage, Position position)                   : Diagnostic(ERROR, message, subMessage, position) {}
-        Error(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(ERROR, code, message, subMessage, position) {}
-
-        Error& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
-        Error& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
-        Error& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
-        Error& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
-        Error& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
+        DiagnosticTy<T>(std::string message)                                                              : Diagnostic(T, message) {}
+        DiagnosticTy<T>(std::string message, Position position)                                           : Diagnostic(T, message, position) {}
+        DiagnosticTy<T>(std::string message, std::string subMessage, Position position)                   : Diagnostic(T, message, subMessage, position) {}
+        DiagnosticTy<T>(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(T, code, message, subMessage, position) {}
+        DiagnosticTy<T>& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
+        DiagnosticTy<T>& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
+        DiagnosticTy<T>& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
+        DiagnosticTy<T>& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
+        DiagnosticTy<T>& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
     };
 
-    class Warning : public Diagnostic {
-    public:
-        Warning(std::string message)                                                              : Diagnostic(WARNING, message) {}
-        Warning(std::string message, Position position)                                           : Diagnostic(WARNING, message, position) {}
-        Warning(std::string message, std::string subMessage, Position position)                   : Diagnostic(WARNING, message, subMessage, position) {}
-        Warning(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(WARNING, code, message, subMessage, position) {}
-
-        Warning& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
-        Warning& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
-        Warning& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
-        Warning& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
-        Warning& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-    };
-
-    class Note : public Diagnostic {
-    public:
-        Note(std::string message)                                                              : Diagnostic(NOTE, message) {}
-        Note(std::string message, Position position)                                           : Diagnostic(NOTE, message, position) {}
-        Note(std::string message, std::string subMessage, Position position)                   : Diagnostic(NOTE, message, subMessage, position) {}
-        Note(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(NOTE, code, message, subMessage, position) {}
-
-        Note& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
-        Note& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
-        Note& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
-        Note& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
-        Note& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-    };
-
-    class Help : public Diagnostic {
-    public:
-        Help(std::string message)                                                              : Diagnostic(HELP, message) {}
-        Help(std::string message, Position position)                                           : Diagnostic(HELP, message, position) {}
-        Help(std::string message, std::string subMessage, Position position)                   : Diagnostic(HELP, message, subMessage, position) {}
-        Help(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(HELP, code, message, subMessage, position) {}
-
-        Help& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
-        Help& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
-        Help& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
-        Help& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
-        Help& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
-    };
+    typedef DiagnosticTy<ERROR> Error;
+    typedef DiagnosticTy<WARNING> Warning;
+    typedef DiagnosticTy<NOTE> Note;
+    typedef DiagnosticTy<HELP> Help;
 
     /******************** implementations ********************/
 
