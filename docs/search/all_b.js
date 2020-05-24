@@ -1,0 +1,6 @@
+var searchData=
+[
+  ['warning',['Warning',['../namespacereporter.html#a60b63a3e80dd080a8d09e6307f9fe41c',1,'reporter']]],
+  ['withhelp',['withHelp',['../classreporter_1_1Diagnostic.html#aa2d43e9c8c87f63e5ec1a518a0a6b49e',1,'reporter::Diagnostic::withHelp(std::string message, Location location)'],['../classreporter_1_1Diagnostic.html#a7e045a4ad5db6e571c93acc8931673f4',1,'reporter::Diagnostic::withHelp(std::string message)'],['../classreporter_1_1DiagnosticTy.html#a45676e98c612b71016c4bd8dbd34d0dd',1,'reporter::DiagnosticTy::withHelp(std::string message, Location location)'],['../classreporter_1_1DiagnosticTy.html#a17a6fd8e528bf8001eb7b177d3162faf',1,'reporter::DiagnosticTy::withHelp(std::string message)']]],
+  ['withnote',['withNote',['../classreporter_1_1Diagnostic.html#a04bc5c51818a127011057232b7f3cbdf',1,'reporter::Diagnostic::withNote(std::string message, Location location)'],['../classreporter_1_1Diagnostic.html#ad0b7c1ad4d47f50800f66731b37a6dbd',1,'reporter::Diagnostic::withNote(std::string message)'],['../classreporter_1_1DiagnosticTy.html#ae6efc70b750be7a2013dcb0184a57561',1,'reporter::DiagnosticTy::withNote(std::string message, Location location)'],['../classreporter_1_1DiagnosticTy.html#a95b84cb6f10672ba934cfb5dbe0851c7',1,'reporter::DiagnosticTy::withNote(std::string message)']]]
+];
