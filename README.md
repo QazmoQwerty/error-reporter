@@ -12,6 +12,7 @@ Used for the Dino compiler.
 auto file = new reporter::SimpleFile("example.cpp");
 auto file2 = new reporter::SimpleFile("reporter.hpp");
 auto err = reporter::Error(
+        "E308",
         "a complex error",
         "this is where the error is, hence the bold red",
         { 4, 9, 13, file }
@@ -21,13 +22,12 @@ auto err = reporter::Error(
     .withNote("a type", { 4, 4, 8, file })
     .withNote("assignment", { 4, 14, 15, file })
     .withNote("a variable with a very long explanation\n"
-                "which requires an especially\n"
-                "large number of lines", { 4, 9, 13, file })
+              "which requires an especially\n"
+              "large number of lines", { 4, 9, 13, file })
     .withHelp("a help message", { 4, 30, 40, file })
 
     .withNote("relevant include in another file\n"
-                "with another line\nand another", {4, 0, 8, file2})
-    .withHelp("something important", {7, 0, 18, file2})
+              "with another line\nand another", {26, 0, 8, file2})
     
     .withHelp("a general help message,\nnot set to any specific location")
     .withNote("can also be a note");
