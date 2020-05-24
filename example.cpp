@@ -4,6 +4,7 @@ int main() {
     auto file = new reporter::SimpleFile("example.cpp");
     auto file2 = new reporter::SimpleFile("reporter.hpp");
     auto err = reporter::Error(
+            "E308",
             "a complex error",
             "this is where the error is, hence the bold red",
             { 4, 9, 13, file }

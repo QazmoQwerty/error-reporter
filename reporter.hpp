@@ -103,8 +103,8 @@ namespace reporter {
     protected:
         ErrorCode errTy;
         std::string code;
-        virtual std::string tyToString();
-        virtual std::string color(std::string str);
+        std::string tyToString();
+        std::string color(std::string str);
     
     public:
         Diagnostic(ErrorCode ty, std::string code, std::string message, std::string subMessage, Position position) 
@@ -257,7 +257,7 @@ namespace reporter {
 
         if (!showAbove && subMsg != "") {
             auto split = splitLines(subMsg);
-            for (int i = 0; i < split.size(); i++) {
+            for (size_t i = 0; i < split.size(); i++) {
                 printIndent(out, maxLine);
                 for (unsigned int i = 0; i < pos.start; i++)
                     out << (line[i] == '\t' ? "\t" : " ");
