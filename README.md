@@ -37,7 +37,7 @@ err.print(std::cerr);
 
 ## Adding to Your Project
 
-Simply copy `reporter.cpp` somewhere into to your project's directories.
+Simply copy `reporter.hpp` somewhere into to your project's directories.
 
 
 ## How to Use
