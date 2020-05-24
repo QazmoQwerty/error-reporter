@@ -4,9 +4,9 @@ int main() {
     auto file = new reporter::SimpleFile("example.cpp");
     auto file2 = new reporter::SimpleFile("reporter.hpp");
     auto err = reporter::Error(
-            "E308",
             "a complex error",
             "this is where the error is, hence the bold red",
+            "E308",
             { 4, 9, 13, file }
         )
         .withNote("a relevant include", { 1, 0, 8, file })
@@ -26,6 +26,7 @@ int main() {
         .withNote("can also be a note");
 
     err.print(std::cerr);
-    
+    delete file;
+    delete file2;
     return 0;
 }

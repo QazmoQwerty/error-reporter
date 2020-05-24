@@ -188,9 +188,9 @@ namespace reporter {
         std::string tyToString();
         std::string color(std::string str);
 
-        Diagnostic(DiagnosticType ty, std::string code, std::string message, std::string subMessage, Location location) 
+        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, std::string code, Location location) 
                : msg(message), subMsg(subMessage), loc(location), errTy(ty), code(code) {};
-        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, Location location) : Diagnostic(ty, "", message, subMessage, location) {};
+        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, Location location) : Diagnostic(ty, message, subMessage, "", location) {};
         Diagnostic(DiagnosticType ty, std::string message, Location location) : Diagnostic(ty, message, "", location) {};
         Diagnostic(DiagnosticType ty, std::string message) : Diagnostic(ty, message, {}) {};
 
@@ -264,19 +264,19 @@ namespace reporter {
 
         /**
          * Constructs a diagnostic at a specific source code location with both a primary message and a submessage, as well as a custom error code.
-         * @param code the error code, can be anything but is usually something like `"E101"` or `"W257"`, for example.
          * @param message the diagnostic message - should essentially be the 'title' of the diagnostic without going into too much detail.
          * @param subMessage the secondary message which is shown directly next to the source code.
+         * @param code the error code, can be anything but is usually something like `"E101"` or `"W257"`, for example.
          * @param location the location the diagnostic is concerning.
          */
-        DiagnosticTy<T>(std::string code, std::string message, std::string subMessage, Location location) : Diagnostic(T, code, message, subMessage, location) {}
+        DiagnosticTy<T>(std::string message, std::string subMessage, std::string code, Location location) : Diagnostic(T, message, subMessage, code, location) {}
 
         /**
          * Pretty-print the diagnostic.
          * @param out stream in which to print the error.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
+        DiagnosticTy<T>& print(std::ostream& out) { Diagnostic::print(out); return *this; };
 
         /**
          * Adds a secondary note message to the diagnostic at `location`.
@@ -299,14 +299,14 @@ namespace reporter {
          * @param message the note message.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
+        DiagnosticTy<T>& withNote(std::string message) { Diagnostic::withNote(message); return *this; };
 
         /**
          * Adds a secondary help message to the diagnostic without a specific location.
          * @param message the help message.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
+        DiagnosticTy<T>& withHelp(std::string message) { Diagnostic::withHelp(message); return *this; };
     };
 
     /////////////////////////////////////////////////////////////////////////
