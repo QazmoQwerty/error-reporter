@@ -22,7 +22,7 @@ int main() {
                   "with another line\nand another", {4, 0, 8, file2})
         .withHelp("something important", {7, 0, 18, file2})
         
-        .withHelp("a general help message,\nnot set to any specific position")
+        .withHelp("a general help message,\nnot set to any specific location")
         .withNote("can also be a note");
 
     err.print(std::cerr);
