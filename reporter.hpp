@@ -405,9 +405,9 @@ namespace reporter {
                     return false;
                 if (a.pos.file != b.pos.file)
                     return a.pos.file->str() < b.pos.file->str();
-                if (a.pos.line > b.pos.line)
-                    return false;
-                return a.pos.start > b.pos.start; 
+                if (a.pos.line == b.pos.line)
+                    return a.pos.start > b.pos.start; 
+                return a.pos.line < b.pos.line;
             }
         );
     }

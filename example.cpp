@@ -10,10 +10,10 @@ int main() {
             reporter::ERROR,
             { 4, 9, 13, file }
         )
-        
+        // .withNote("a note?")
         .withNote("a relevant include", { 1, 0, 8, file })
         .withNote("curly brace", { 3, 11, 12, file })
-        // .withNote("another curly brace", { 15, 8, 1, file })
+        .withNote("another curly brace", { 15, 8, 1, file })
         .withNote("a type", { 4, 4, 8, file })
         .withNote("assignment", { 4, 14, 15, file })
         .withNote("a variable with a very long explanation\n"
