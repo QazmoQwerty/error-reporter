@@ -9,11 +9,11 @@ A simple implementation for pretty error diagnostics. Used for the Dino compiler
 ```c++
 auto file = new SourceFile("Main.cpp");
 auto file2 = new SourceFile("ErrorReporter.cpp");
-ErrorReporter::report(
-    ErrorReporter::Error(
+reporter::report(
+    reporter::Error(
         "a complex error",
         "this is where the error is, hence the bold red",
-        ERR_GENERAL,
+        ERROR,
         { 4, 9, 13, file }
     )
     

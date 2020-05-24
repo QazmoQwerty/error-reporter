@@ -1,23 +1,142 @@
-#include "ErrorReporter.h"
-#include "TerminalColors.h"
 
-namespace ErrorReporter {
+#ifndef ERROR_REPORTER_HPP_INCLUDED
+#define ERROR_REPORTER_HPP_INCLUDED
 
-    string getLine(string fileName, int line) {
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <algorithm>
+
+namespace reporter {
+
+    namespace colors {
+        class Color {
+            unsigned char _code;
+        public:
+            Color(unsigned char code) : _code(code) {}
+            std::string operator()(std::string str) const {
+                return "\x1B[" + std::to_string(_code) + "m" + str + "\x1B[0m";
+            }
+        };
+
+        const Color bold      (1);
+        const Color weak      (2);
+        const Color italic    (3);
+        const Color underline (4);
+
+        const Color black   (30);
+        const Color red     (31);
+        const Color green   (32);
+        const Color yellow  (33);
+        const Color blue    (34);
+        const Color magenta (35);
+        const Color cyan    (36);
+        const Color white   (37);
+    }
+
+    enum ErrorCode {
+        INTERNAL_ERROR = 0,
+        ERROR          = 10000,
+        WARNING        = 20000,
+        NOTE           = 30000,
+        HELP           = 40000,
+        UNKNOWN        = 50000,
+    };
+
+    class SourceFile {
+    public: 
+        virtual std::string str() = 0;
+    };
+
+    /*
+        A minimal SourceFile class to get you started
+    */
+    class SimpleFile : public SourceFile {
+    private:
+        std::string _path;
+    public:     
+        SimpleFile(std::string path) : _path(path) {};
+        std::string str() { return _path; };
+    };
+
+    /* 
+        Basic information about the position of a token or node 
+
+        example: { line=2, start=2, end=5 }
+        means:   "on second line, from the 3rd character to (and excluding) the 6th character"
+    */
+    class Position {
+    public:
+        unsigned int line;
+        unsigned int start;
+        unsigned int end;
+        SourceFile* file;
+    };
+
+    class Error {
+    public:
+        Error(std::string message, ErrorCode type, Position position);
+        Error(std::string message, std::string subMessage, ErrorCode type, Position position);
+        void show();
+        Error& withNote(std::string message, Position position);
+        Error& withHelp(std::string message, Position position);
+        Error& withNote(std::string message);
+        Error& withHelp(std::string message);
+    private:
+        std::string msg;
+        std::string subMsg;
+        ErrorCode errTy;
+        Position pos;
+        std::vector<Error> secondaries;
+
+        std::string tyToString();
+        void sortSecondaries();
+        std::string color(std::string str);
+        void showSecondariesOnLine(std::string &line, size_t &i, unsigned int maxLine);
+        void printIndent(unsigned int maxLine, bool showBar = true);
+        void printIndentWithLineNum(unsigned int maxLine, bool showBar = true);
+        void printPaddingLine(unsigned int maxLine, unsigned int line = 0, SourceFile *file = NULL);
+    };
+
+    /*
+        Static class which contains a vector of Errors. 
+        Any compile errors/warnings found will be reported here.
+    */
+    extern std::vector<Error> errors;
+
+    const Position POS_NONE = {0, 0, 0, NULL};
+
+    /* Pretty-prints all errors reported so far */
+    void showAll();
+
+    /* 
+        Create and save an error/warning.
+        Returns the Error created.
+    */
+    Error& report(Error err);
+    Error& report(std::string msg, ErrorCode errCode, Position pos);
+    Error& report(std::string msg, std::string subMsg, ErrorCode errCode, Position pos);
+
+
+    /******************** implementations ********************/
+
+
+    std::string getLine(std::string fileName, int line) {
         std::fstream file(fileName);
         file.seekg(std::ios::beg);
         for (int i=0; i < line - 1; ++i)
             file.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
-        string ret;
+        std::string ret;
         std::getline(file, ret);
         return ret;
     }
     
-    vector<string> splitLines(const string& str) {
-        vector<string> strings;
-        string::size_type pos = 0;
-        string::size_type prev = 0;
-        while ((pos = str.find("\n", prev)) != string::npos) {
+    std::vector<std::string> splitLines(const std::string& str) {
+        std::vector<std::string> strings;
+        std::string::size_type pos = 0;
+        std::string::size_type prev = 0;
+        while ((pos = str.find("\n", prev)) != std::string::npos) {
             strings.push_back(str.substr(prev, pos - prev));
             prev = pos + 1;
         }
@@ -26,7 +145,7 @@ namespace ErrorReporter {
         return strings;
     }
 
-    vector<Error> errors;
+    std::vector<Error> errors;
 
     void showAll() { for (auto& i : errors) i.show(); }
 
@@ -36,22 +155,22 @@ namespace ErrorReporter {
         return errors.back();
     }
 
-    Error& report(string msg, ErrorCode errCode, Position pos)                { return report(Error(msg, errCode, pos));         }
-    Error& report(string msg, string subMsg, ErrorCode errCode, Position pos) { return report(Error(msg, subMsg, errCode, pos)); }
+    Error& report(std::string msg, ErrorCode errCode, Position pos)                { return report(Error(msg, errCode, pos));         }
+    Error& report(std::string msg, std::string subMsg, ErrorCode errCode, Position pos) { return report(Error(msg, subMsg, errCode, pos)); }
 
-    Error::Error(string message,  string subMessage, ErrorCode type, Position position) 
+    Error::Error(std::string message,  std::string subMessage, ErrorCode type, Position position) 
                   : msg(message), subMsg(subMessage),    errTy(type),     pos(position) {
         if (pos.start >= pos.end)
             pos.end = pos.start + 1;
     };
 
-    Error::Error(string message, ErrorCode type, Position position) : Error(message, "", type, position) {};
+    Error::Error(std::string message, ErrorCode type, Position position) : Error(message, "", type, position) {};
 
-    Error& Error::withNote(string message, Position position) { secondaries.push_back(Error("", message, NOTE_GENERAL, position)); return *this; }
-    Error& Error::withHelp(string message, Position position) { secondaries.push_back(Error("", message, HELP_GENERAL, position)); return *this; }
+    Error& Error::withNote(std::string message, Position position) { secondaries.push_back(Error("", message, NOTE, position)); return *this; }
+    Error& Error::withHelp(std::string message, Position position) { secondaries.push_back(Error("", message, HELP, position)); return *this; }
 
-    Error& Error::withNote(string message) { return withNote(message, POS_NONE); }
-    Error& Error::withHelp(string message) { return withHelp(message, POS_NONE); }
+    Error& Error::withNote(std::string message) { return withNote(message, POS_NONE); }
+    Error& Error::withHelp(std::string message) { return withHelp(message, POS_NONE); }
 
     #define ON_SAME_LINE(a, b) ((a).pos.file == (b).pos.file && (a).pos.line == (b).pos.line)
 
@@ -71,7 +190,7 @@ namespace ErrorReporter {
 
         // show the main error message
         if (msg != "")
-            std::cout << color(tyToString() + ": ") << BOLD(msg) << "\n";
+            std::cout << color(tyToString() + ": ") << colors::bold(msg) << "\n";
 
         if (pos.file == NULL) return;
 
@@ -98,7 +217,7 @@ namespace ErrorReporter {
                 else printPaddingLine(maxLine);
             }
             lastLine = secondary.pos.line;
-            string line = getLine(pos.file->str(), secondary.pos.line);
+            std::string line = getLine(pos.file->str(), secondary.pos.line);
 
             auto tmp = secondary.errTy;
             secondary.errTy = errTy;
@@ -110,7 +229,7 @@ namespace ErrorReporter {
             showSecondariesOnLine(line, i, maxLine);
         }
 
-        string line = getLine(pos.file->str(), pos.line);
+        std::string line = getLine(pos.file->str(), pos.line);
 
         if (isFirst && !showAbove) {
             printIndent(maxLine);
@@ -181,7 +300,7 @@ namespace ErrorReporter {
                 printPaddingLine(maxLine);
 
             lastLine = secondary.pos.line;
-            string line = getLine(pos.file->str(), secondary.pos.line);
+            std::string line = getLine(pos.file->str(), secondary.pos.line);
             auto tmp = secondary.errTy;
             secondary.errTy = errTy;
             secondary.printIndentWithLineNum(maxLine);
@@ -208,7 +327,7 @@ namespace ErrorReporter {
         }
     }
 
-    void Error::showSecondariesOnLine(string &line, size_t &i, unsigned int maxLine) {
+    void Error::showSecondariesOnLine(std::string &line, size_t &i, unsigned int maxLine) {
         auto &first = secondaries[i];
         printIndent(maxLine);
         if (i + 1 >= secondaries.size() || !ON_SAME_LINE(first, secondaries[i + 1])) {
@@ -294,34 +413,34 @@ namespace ErrorReporter {
         );
     }
 
-    string Error::tyToString() {
-        if (ERR_GENERAL < errTy && errTy < WRN_GENERAL)
+    std::string Error::tyToString() {
+        if (ERROR < errTy && errTy < WARNING)
             return "Error(E" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == ERR_GENERAL)
+        else if (errTy == ERROR)
             return "Error";
-        else if (WRN_GENERAL < errTy && errTy < NOTE_GENERAL)
+        else if (WARNING < errTy && errTy < NOTE)
             return "Warning(W" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == WRN_GENERAL)
+        else if (errTy == WARNING)
             return "Warning";
-        else if (NOTE_GENERAL < errTy && errTy < HELP_GENERAL)
+        else if (NOTE < errTy && errTy < HELP)
             return "Note(N" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == NOTE_GENERAL)
+        else if (errTy == NOTE)
             return "Note";
-        else if (HELP_GENERAL < errTy && errTy < ERR_UNKNOWN)
+        else if (HELP < errTy && errTy < UNKNOWN)
             return "Help(H" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == HELP_GENERAL)
+        else if (errTy == HELP)
             return "Help";
         return "Internal Error";
     }
 
-    string Error::color(string str) {
-        if (WRN_GENERAL <= errTy && errTy < NOTE_GENERAL)
-            return BOLD(FYEL(str));
-        if (NOTE_GENERAL <= errTy && errTy < HELP_GENERAL)
-            return BOLD(FBLK(str));
-        if (HELP_GENERAL <= errTy && errTy < ERR_UNKNOWN)
-            return BOLD(FBLU(str));
-        return BOLD(FRED(str));
+    std::string Error::color(std::string str) {
+        if (WARNING <= errTy && errTy < NOTE)
+            return colors::bold(colors::yellow(str));
+        if (NOTE <= errTy && errTy < HELP)
+            return colors::bold(colors::black(str));
+        if (HELP <= errTy && errTy < UNKNOWN)
+            return colors::bold(colors::blue(str));
+        return colors::bold(colors::red(str));
     }
 
     void Error::printPaddingLine(unsigned int maxLine, unsigned int line, SourceFile *file) {
@@ -360,3 +479,5 @@ namespace ErrorReporter {
             std::cout << color("│ ");
     }
 }
+
+#endif /* ERROR_REPORTER_HPP_INCLUDED */
