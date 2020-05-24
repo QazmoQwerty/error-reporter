@@ -1,4 +1,3 @@
-
 #ifndef ERROR_REPORTER_HPP_INCLUDED
 #define ERROR_REPORTER_HPP_INCLUDED
 
@@ -300,7 +299,7 @@ namespace reporter {
                 printPaddingLine(maxLine);
 
             lastLine = secondary.pos.line;
-            std::string line = getLine(pos.file->str(), secondary.pos.line);
+            std::string line = getLine(currFile->str(), secondary.pos.line);
             auto tmp = secondary.errTy;
             secondary.errTy = errTy;
             secondary.printIndentWithLineNum(maxLine);
