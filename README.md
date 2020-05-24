@@ -1,4 +1,4 @@
-# Error Reporter
+# Diagnostic Reporter
 
 A simple implementation for pretty error diagnostics. Used for the Dino compiler.
 
@@ -10,7 +10,7 @@ A simple implementation for pretty error diagnostics. Used for the Dino compiler
 auto file = new reporter::SimpleFile("example.cpp");
 auto file2 = new reporter::SimpleFile("reporter.hpp");
 reporter::report(
-    reporter::Error(
+    reporter::Diagnostic(
         "a complex error",
         "this is where the error is, hence the bold red",
         reporter::ERROR,
@@ -18,9 +18,9 @@ reporter::report(
     )
 
     .withNote("a relevant include", { 1, 0, 8, file })
-    .withNote("curly brace", { 3, 16, 17, file })
+    .withNote("curly brace", { 3, 16, file })
     .withNote("a type", { 4, 4, 8, file })
-    .withNote("assignment", { 4, 14, 15, file })
+    .withNote("assignment", { 4, 14, file })
     .withNote("a variable with a very long explanation\n"
                 "which requires an especially\n"
                 "large number of lines", { 4, 9, 13, file })
@@ -30,6 +30,6 @@ reporter::report(
     .withHelp("something important", {7, 0, 18, file2})
 
     .withHelp("a general help message,\nnot set to any specific position")
-.withNote("can also be a note")
+    .withNote("can also be a note")
 );
 ```

@@ -36,11 +36,11 @@ namespace reporter {
 
     enum ErrorCode {
         INTERNAL_ERROR = 0,
-        ERROR          = 10000,
-        WARNING        = 20000,
-        NOTE           = 30000,
-        HELP           = 40000,
-        UNKNOWN        = 50000,
+        ERROR          = 1,
+        WARNING        = 2,
+        NOTE           = 3,
+        HELP           = 4,
+        UNKNOWN        = 5,
     };
 
     class SourceFile {
@@ -71,57 +71,128 @@ namespace reporter {
         unsigned int start;
         unsigned int end;
         SourceFile* file;
+
+        Position(unsigned int line, unsigned int start, unsigned int end, SourceFile* file)
+                : line(line), start(start), end(end), file(file) {
+            if (this->end <= this->start)
+                this->end = this->start + 1;
+        }
+
+        Position(unsigned int line, unsigned int pos, SourceFile* file) : Position(line, pos, pos + 1, file) {}
+
+        Position() : Position(0, 0, 0, nullptr) {}
     };
 
-    class Error {
-    public:
-        Error(std::string message, ErrorCode type, Position position);
-        Error(std::string message, std::string subMessage, ErrorCode type, Position position);
-        void show();
-        Error& withNote(std::string message, Position position);
-        Error& withHelp(std::string message, Position position);
-        Error& withNote(std::string message);
-        Error& withHelp(std::string message);
+    class Diagnostic {
     private:
+        static std::vector<std::string> splitLines(const std::string& str);
+        static std::string getLine(std::string fileName, int line);
+
         std::string msg;
         std::string subMsg;
-        ErrorCode errTy;
         Position pos;
-        std::vector<Error> secondaries;
+        std::vector<Diagnostic> secondaries;
 
-        std::string tyToString();
         void sortSecondaries();
-        std::string color(std::string str);
-        void showSecondariesOnLine(std::string &line, size_t &i, unsigned int maxLine);
-        void printIndent(unsigned int maxLine, bool showBar = true);
-        void printIndentWithLineNum(unsigned int maxLine, bool showBar = true);
-        void printPaddingLine(unsigned int maxLine, unsigned int line = 0, SourceFile *file = NULL);
+        void showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine);
+        void printIndent(std::ostream& out, unsigned int maxLine, bool showBar = true);
+        void printIndentWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar = true);
+        void printIndentWithLineNum(std::ostream& out, unsigned int maxLine, bool showBar = true);
+        void printPaddingLine(std::ostream& out, unsigned int maxLine, unsigned int line = 0, SourceFile *file = nullptr);
+
+    protected:
+        ErrorCode errTy;
+        std::string code;
+        virtual std::string tyToString();
+        virtual std::string color(std::string str);
+    
+    public:
+        Diagnostic(ErrorCode ty, std::string code, std::string message, std::string subMessage, Position position) 
+               : msg(message), subMsg(subMessage), pos(position), errTy(ty), code(code) {};
+        
+        Diagnostic(ErrorCode ty, std::string message, std::string subMessage, Position position) : Diagnostic(ty, "", message, subMessage, position) {};
+        Diagnostic(ErrorCode ty, std::string message, Position position) : Diagnostic(ty, message, "", position) {};
+        Diagnostic(ErrorCode ty, std::string message) : Diagnostic(ty, message, {}) {};
+
+        Diagnostic& print(std::ostream& out);
+        Diagnostic& withNote(std::string message, Position position);
+        Diagnostic& withHelp(std::string message, Position position);
+        Diagnostic& withNote(std::string message);
+        Diagnostic& withHelp(std::string message);
     };
 
-    /*
-        Static class which contains a vector of Errors. 
-        Any compile errors/warnings found will be reported here.
-    */
-    extern std::vector<Error> errors;
+    class Error : public Diagnostic {
+    public:
+        Error(std::string message)                                                              : Diagnostic(ERROR, message) {}
+        Error(std::string message, Position position)                                           : Diagnostic(ERROR, message, position) {}
+        Error(std::string message, std::string subMessage, Position position)                   : Diagnostic(ERROR, message, subMessage, position) {}
+        Error(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(ERROR, code, message, subMessage, position) {}
 
-    const Position POS_NONE = {0, 0, 0, NULL};
+        Error& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
+        Error& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
+        Error& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
+        Error& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
+        Error& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
 
-    /* Pretty-prints all errors reported so far */
-    void showAll();
+    private:
+        std::string tyToString() { return code == "" ? "Error" : "Error(" + code + ")"; }
+        std::string color(std::string str) { return colors::bold(colors::red(str)); }
+    };
 
-    /* 
-        Create and save an error/warning.
-        Returns the Error created.
-    */
-    Error& report(Error err);
-    Error& report(std::string msg, ErrorCode errCode, Position pos);
-    Error& report(std::string msg, std::string subMsg, ErrorCode errCode, Position pos);
+    class Warning : public Diagnostic {
+    public:
+        Warning(std::string message)                                                              : Diagnostic(WARNING, message) {}
+        Warning(std::string message, Position position)                                           : Diagnostic(WARNING, message, position) {}
+        Warning(std::string message, std::string subMessage, Position position)                   : Diagnostic(WARNING, message, subMessage, position) {}
+        Warning(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(WARNING, code, message, subMessage, position) {}
 
+        Warning& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
+        Warning& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
+        Warning& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
+        Warning& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
+        Warning& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
+    private:
+        std::string tyToString() { return code == "" ? "Warning" : "Warning(" + code + ")"; }
+        std::string color(std::string str) { return colors::bold(colors::yellow(str)); }
+    };
+
+    class Note : public Diagnostic {
+    public:
+        Note(std::string message)                                                              : Diagnostic(NOTE, message) {}
+        Note(std::string message, Position position)                                           : Diagnostic(NOTE, message, position) {}
+        Note(std::string message, std::string subMessage, Position position)                   : Diagnostic(NOTE, message, subMessage, position) {}
+        Note(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(NOTE, code, message, subMessage, position) {}
+
+        Note& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
+        Note& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
+        Note& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
+        Note& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
+        Note& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
+    private:
+        std::string tyToString() { return code == "" ? "Note" : "Note(" + code + ")"; }
+        std::string color(std::string str) { return colors::bold(colors::black(str)); }
+    };
+
+    class Help : public Diagnostic {
+    public:
+        Help(std::string message)                                                              : Diagnostic(HELP, message) {}
+        Help(std::string message, Position position)                                           : Diagnostic(HELP, message, position) {}
+        Help(std::string message, std::string subMessage, Position position)                   : Diagnostic(HELP, message, subMessage, position) {}
+        Help(std::string code, std::string message, std::string subMessage, Position position) : Diagnostic(HELP, code, message, subMessage, position) {}
+
+        Help& print(std::ostream& out)                         { Diagnostic::print(out);                  return *this; };
+        Help& withNote(std::string message, Position position) { Diagnostic::withNote(message, position); return *this; };
+        Help& withHelp(std::string message, Position position) { Diagnostic::withHelp(message, position); return *this; };
+        Help& withNote(std::string message)                    { Diagnostic::withNote(message);           return *this; };
+        Help& withHelp(std::string message)                    { Diagnostic::withHelp(message);           return *this; };
+    private:
+        std::string tyToString() { return code == "" ? "Help" : "Help(" + code + ")"; }
+        std::string color(std::string str) { return colors::bold(colors::blue(str)); }
+    };
 
     /******************** implementations ********************/
 
-
-    std::string getLine(std::string fileName, int line) {
+    std::string Diagnostic::getLine(std::string fileName, int line) {
         std::fstream file(fileName);
         file.seekg(std::ios::beg);
         for (int i=0; i < line - 1; ++i)
@@ -131,7 +202,7 @@ namespace reporter {
         return ret;
     }
     
-    std::vector<std::string> splitLines(const std::string& str) {
+    std::vector<std::string> Diagnostic::splitLines(const std::string& str) {
         std::vector<std::string> strings;
         std::string::size_type pos = 0;
         std::string::size_type prev = 0;
@@ -144,39 +215,17 @@ namespace reporter {
         return strings;
     }
 
-    std::vector<Error> errors;
-
-    void showAll() { for (auto& i : errors) i.show(); }
-
-    Error& report(Error err) {
-        errors.push_back(err);
-        err.show();
-        return errors.back();
-    }
-
-    Error& report(std::string msg, ErrorCode errCode, Position pos)                { return report(Error(msg, errCode, pos));         }
-    Error& report(std::string msg, std::string subMsg, ErrorCode errCode, Position pos) { return report(Error(msg, subMsg, errCode, pos)); }
-
-    Error::Error(std::string message,  std::string subMessage, ErrorCode type, Position position) 
-                  : msg(message), subMsg(subMessage),    errTy(type),     pos(position) {
-        if (pos.start >= pos.end)
-            pos.end = pos.start + 1;
-    };
-
-    Error::Error(std::string message, ErrorCode type, Position position) : Error(message, "", type, position) {};
-
-    Error& Error::withNote(std::string message, Position position) { secondaries.push_back(Error("", message, NOTE, position)); return *this; }
-    Error& Error::withHelp(std::string message, Position position) { secondaries.push_back(Error("", message, HELP, position)); return *this; }
-
-    Error& Error::withNote(std::string message) { return withNote(message, POS_NONE); }
-    Error& Error::withHelp(std::string message) { return withHelp(message, POS_NONE); }
-
     #define ON_SAME_LINE(a, b) ((a).pos.file == (b).pos.file && (a).pos.line == (b).pos.line)
 
-    void Error::show() {
+    Diagnostic& Diagnostic::withNote(std::string message, Position position) { secondaries.push_back(Note("", message, position)); return *this; }
+    Diagnostic& Diagnostic::withHelp(std::string message, Position position) { secondaries.push_back(Help("", message, position)); return *this; }
+    Diagnostic& Diagnostic::withNote(std::string message) { return withNote(message, {}); }
+    Diagnostic& Diagnostic::withHelp(std::string message) { return withHelp(message, {}); }
+
+    Diagnostic& Diagnostic::print(std::ostream& out) {
         // find the maximum line (to know by how much to indent the bars)
         auto maxLine = pos.line;
-        for (auto secondary : secondaries)
+        for (auto& secondary : secondaries)
             if (secondary.pos.line > maxLine)
                 maxLine = secondary.pos.line;
 
@@ -187,97 +236,90 @@ namespace reporter {
             if (ON_SAME_LINE(secondaries[i], *this))
                 showAbove = true;
 
-        // show the main error message
+        // print the main error message
         if (msg != "")
-            std::cout << color(tyToString() + ": ") << colors::bold(msg) << "\n";
+            out << color(tyToString() + ": ") << colors::bold(msg) << "\n";
 
-        if (pos.file == NULL) return;
-
+        if (pos.file == nullptr) return *this;
 
         // print the file the error is in
-        printIndent(maxLine, false);
-        std::cout << color("╭─ ") << pos.file->str() << color(" ─╴") << "\n";
+        printIndent(out, maxLine, false);
+        out << color("╭─ ") << pos.file->str() << color(" ─╴") << "\n";
 
         bool isFirst = true;
         unsigned int lastLine = 0;
         size_t i = 0;
 
-        // first show all messages in the main file which come before the error
+        // first print all messages in the main file which come before the error
         while (i < secondaries.size() && secondaries[i].pos.file == pos.file && secondaries[i].pos.line < pos.line) {
             auto &secondary = secondaries[i];
             
             if (isFirst) {
-                printIndent(maxLine);
-                std::cout << "\n";
+                printIndent(out, maxLine);
+                out << "\n";
                 isFirst = false;
             } else if (lastLine < secondary.pos.line - 1)  {
                 if (lastLine == secondary.pos.line - 2)
-                    printPaddingLine(maxLine, secondary.pos.line - 1, secondary.pos.file);
-                else printPaddingLine(maxLine);
+                    printPaddingLine(out, maxLine, secondary.pos.line - 1, secondary.pos.file);
+                else printPaddingLine(out, maxLine);
             }
             lastLine = secondary.pos.line;
             std::string line = getLine(pos.file->str(), secondary.pos.line);
-
-            auto tmp = secondary.errTy;
-            secondary.errTy = errTy;
-            secondary.printIndentWithLineNum(maxLine);
-            secondary.errTy = tmp;
-
-            std::cout << line << "\n";
-
-            showSecondariesOnLine(line, i, maxLine);
+            printIndentWithLineNum(out, secondary.pos.line, maxLine);
+            out << line << "\n";
+            showSecondariesOnLine(out, line, i, maxLine);
         }
 
         std::string line = getLine(pos.file->str(), pos.line);
 
         if (isFirst && !showAbove) {
-            printIndent(maxLine);
-            std::cout << "\n";
+            printIndent(out, maxLine);
+            out << "\n";
         } else if (lastLine != 0 && lastLine < pos.line - 1) {
             if (lastLine == pos.line - 2)
-                printPaddingLine(maxLine, pos.line - 1, pos.file);
-            else printPaddingLine(maxLine);
+                printPaddingLine(out, maxLine, pos.line - 1, pos.file);
+            else printPaddingLine(out, maxLine);
         }
         lastLine = pos.line;
         
         if (showAbove) {
             if (subMsg != "") {
                 for (auto currLine : splitLines(subMsg)) {
-                    printIndent(maxLine);
+                    printIndent(out, maxLine);
                     for (unsigned int i = 0; i < pos.start; i++)
-                        std::cout << (line[i] == '\t' ? "\t" : " ");
-                    std::cout << color(currLine);
-                    std::cout << "\n";
+                        out << (line[i] == '\t' ? "\t" : " ");
+                    out << color(currLine);
+                    out << "\n";
                 }
             }
             
-            printIndent(maxLine);
+            printIndent(out, maxLine);
 
             for (unsigned int i = 0; i < pos.start; i++)
-                std::cout << (line[i] == '\t' ? "\t" : " ");
+                out << (line[i] == '\t' ? "\t" : " ");
             for (unsigned int i = 0; i < pos.end - pos.start; i++)
-                std::cout << color("v");
-            std::cout << "\n";
+                out << color("v");
+            out << "\n";
         }
         
-        printIndentWithLineNum(maxLine);
-        std::cout << line << "\n";
+        printIndentWithLineNum(out, maxLine);
+        out << line << "\n";
 
         if (!showAbove && subMsg != "") {
             auto split = splitLines(subMsg);
             for (int i = 0; i < split.size(); i++) {
-                printIndent(maxLine);
+                printIndent(out, maxLine);
                 for (unsigned int i = 0; i < pos.start; i++)
-                    std::cout << (line[i] == '\t' ? "\t" : " ");
+                    out << (line[i] == '\t' ? "\t" : " ");
                 for (unsigned int j = 0; j < pos.end - pos.start; j++)
-                    std::cout << color(i == 0 ? "^" : " ");
-                std::cout << " ";
-                std::cout << color(split[i]) << "\n";
+                    out << color(i == 0 ? "^" : " ");
+                out << " ";
+                out << color(split[i]) << "\n";
             }
         }
       
         if (i < secondaries.size() && ON_SAME_LINE(secondaries[i], *this))
-            showSecondariesOnLine(line, i, maxLine);
+            showSecondariesOnLine(out, line, i, maxLine);
         
         auto currFile = pos.file;
         while (i < secondaries.size() && secondaries[i].pos.file) {
@@ -285,64 +327,62 @@ namespace reporter {
 
             if (secondary.pos.file->str() != currFile->str()) {
                 currFile = secondary.pos.file;
-                for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) std::cout << color("─");
-                std::cout << color("╯") << "\n";
-                printIndent(maxLine, false);
-                std::cout << color("╭─ ") << currFile->str() << color(" ─╴") << "\n";
-                printIndent(maxLine);
-                std::cout << "\n";
+                for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) out << color("─");
+                out << color("╯") << "\n";
+                printIndent(out, maxLine, false);
+                out << color("╭─ ") << currFile->str() << color(" ─╴") << "\n";
+                printIndent(out, maxLine);
+                out << "\n";
             }
 
             if (lastLine == secondary.pos.line - 2)
-                printPaddingLine(maxLine, secondary.pos.line - 1, secondary.pos.file);
+                printPaddingLine(out, maxLine, secondary.pos.line - 1, secondary.pos.file);
             else if (lastLine < secondary.pos.line - 1)
-                printPaddingLine(maxLine);
+                printPaddingLine(out, maxLine);
 
             lastLine = secondary.pos.line;
             std::string line = getLine(currFile->str(), secondary.pos.line);
-            auto tmp = secondary.errTy;
-            secondary.errTy = errTy;
-            secondary.printIndentWithLineNum(maxLine);
-            secondary.errTy = tmp;
-            std::cout << line << "\n";
-            showSecondariesOnLine(line, i, maxLine);
+            printIndentWithLineNum(out, secondary.pos.line, maxLine);
+            out << line << "\n";
+            showSecondariesOnLine(out, line, i, maxLine);
         }
 
-        for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) std::cout << color("─");
-        std::cout << color("╯") << "\n"; 
+        for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) out << color("─");
+        out << color("╯") << "\n"; 
         for (; i < secondaries.size(); i++) {
             auto& secondary = secondaries[i];
-            printIndent(maxLine, false);
-            std::cout << secondary.color("• " + secondary.tyToString() + secondary.color(": "));
+            printIndent(out, maxLine, false);
+            out << secondary.color("• " + secondary.tyToString() + secondary.color(": "));
             auto lines = splitLines(secondary.subMsg);
             for (size_t idx = 0; idx < lines.size(); idx++) {
                 if (idx != 0) {
-                    printIndent(maxLine, false);
+                    printIndent(out, maxLine, false);
                     for (size_t j = 0; j < secondary.tyToString().size() + 4; j++)
-                        std::cout << " ";
+                        out << " ";
                 }
-                std::cout << lines[idx] << "\n";
+                out << lines[idx] << "\n";
             }
         }
+        return *this;
     }
 
-    void Error::showSecondariesOnLine(std::string &line, size_t &i, unsigned int maxLine) {
+    void Diagnostic::showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine) {
         auto &first = secondaries[i];
-        printIndent(maxLine);
+        printIndent(out, maxLine);
         if (i + 1 >= secondaries.size() || !ON_SAME_LINE(first, secondaries[i + 1])) {
             // only one secondary concerning this line
             for (size_t idx = 0; idx < first.pos.start; idx++)
-                std::cout << (line[idx] == '\t' ? '\t' : ' ');
+                out << (line[idx] == '\t' ? '\t' : ' ');
             for (size_t idx = 0; idx < first.pos.end - first.pos.start; idx++)
-                std::cout << first.color("~");
+                out << first.color("~");
             auto lines = splitLines(first.subMsg);
             for (size_t idx = 0; idx < lines.size(); idx++) {
                 if (idx != 0) {
-                    printIndent(maxLine);
+                    printIndent(out, maxLine);
                     for (size_t j = 0; j < first.pos.end; j++)
-                        std::cout << (line[j] == '\t' ? '\t' : ' ');
+                        out << (line[j] == '\t' ? '\t' : ' ');
                 }
-                std::cout << " " << first.color(lines[idx]) << "\n";
+                out << " " << first.color(lines[idx]) << "\n";
             }
             i++;
         } else {
@@ -350,51 +390,51 @@ namespace reporter {
                 bool b = false;
                 for (auto idx = i; !b && idx < secondaries.size() && ON_SAME_LINE(secondaries[idx], first); idx++)
                     if (secondaries[idx].pos.start <= lineIdx && lineIdx < secondaries[idx].pos.end) {
-                        std::cout << secondaries[idx].color("~");
+                        out << secondaries[idx].color("~");
                         b = true;
                     }
-                if (!b) std::cout << " ";
+                if (!b) out << " ";
             }
-            std::cout << "\n";
+            out << "\n";
             for (; i < secondaries.size() && ON_SAME_LINE(secondaries[i], first); i++) {
-                printIndent(maxLine);
+                printIndent(out, maxLine);
                 for (size_t j = 0; j < secondaries[i].pos.start; j++) {
                     bool b = false;
                     for (auto idx = i; !b && idx < secondaries.size() && ON_SAME_LINE(secondaries[idx], first); idx++)
                         if (secondaries[idx].pos.start == j) {
-                            std::cout << secondaries[idx].color("│");
+                            out << secondaries[idx].color("│");
                             b = true;
                         }
-                    if (!b) std::cout << " ";
+                    if (!b) out << " ";
                 }
                 auto lines = splitLines(secondaries[i].subMsg);
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx == 0)
-                        std::cout << secondaries[i].color("╰ ") << secondaries[i].color(lines[idx]) << "\n";
+                        out << secondaries[i].color("╰ ") << secondaries[i].color(lines[idx]) << "\n";
                     else {
-                        printIndent(maxLine);
+                        printIndent(out, maxLine);
                         for (size_t j = 0; j < secondaries[i].pos.start; j++) {
                             bool b = false;
 
                             for (auto idx = i; !b && idx < secondaries.size() && ON_SAME_LINE(secondaries[idx], first); idx++)
                                 if (secondaries[idx].pos.start == j) {
-                                    std::cout << secondaries[idx].color("│");
+                                    out << secondaries[idx].color("│");
                                     b = true;
                                 }
-                            if (!b) std::cout << " ";
+                            if (!b) out << " ";
                         }
-                        std::cout << secondaries[i].color("  ") << secondaries[i].color(lines[idx]) << "\n";
+                        out << secondaries[i].color("  ") << secondaries[i].color(lines[idx]) << "\n";
                     }
                 }
             }
         }
     }
 
-    void Error::sortSecondaries() {
+    void Diagnostic::sortSecondaries() {
         auto file = pos.file;
         std::sort(
             std::begin(secondaries), std::end(secondaries), 
-            [file](Error a, Error b) {
+            [file](Diagnostic &a, Diagnostic &b) {
                 if (!a.pos.file) 
                     return false;
                 if (!b.pos.file) 
@@ -412,70 +452,64 @@ namespace reporter {
         );
     }
 
-    std::string Error::tyToString() {
-        if (ERROR < errTy && errTy < WARNING)
-            return "Error(E" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == ERROR)
-            return "Error";
-        else if (WARNING < errTy && errTy < NOTE)
-            return "Warning(W" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == WARNING)
-            return "Warning";
-        else if (NOTE < errTy && errTy < HELP)
-            return "Note(N" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == NOTE)
-            return "Note";
-        else if (HELP < errTy && errTy < UNKNOWN)
-            return "Help(H" + std::to_string(errTy).substr(1) + ")";
-        else if (errTy == HELP)
-            return "Help";
-        return "Internal Error";
-    }
-
-    std::string Error::color(std::string str) {
-        if (WARNING <= errTy && errTy < NOTE)
-            return colors::bold(colors::yellow(str));
-        if (NOTE <= errTy && errTy < HELP)
-            return colors::bold(colors::black(str));
-        if (HELP <= errTy && errTy < UNKNOWN)
-            return colors::bold(colors::blue(str));
-        return colors::bold(colors::red(str));
-    }
-
-    void Error::printPaddingLine(unsigned int maxLine, unsigned int line, SourceFile *file) {
+    void Diagnostic::printPaddingLine(std::ostream& out, unsigned int maxLine, unsigned int line, SourceFile *file) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
         if (line == 0) {
             switch (targetSize) {
-                case 3:  std::cout << " " << color("⋯") << "\n"; break;
-                case 4:  std::cout << " " << color("··") << "\n"; break;
-                default: std::cout << " " << color("···") << "\n"; break;
+                case 3:  out << " " << color("⋯") << "\n"; break;
+                case 4:  out << " " << color("··") << "\n"; break;
+                default: out << " " << color("···") << "\n"; break;
             }   
         } else {
             auto str = " " + std::to_string(line) + " ";
             while (str.size() < targetSize)
                 str += " ";
             str += "│ ";
-            std::cout << color(str);
-            if (file) std::cout << getLine(file->str(), line);
-            std::cout << "\n";
+            out << color(str);
+            if (file) out << getLine(file->str(), line);
+            out << "\n";
         }
     }
 
-    void Error::printIndent(unsigned int maxLine, bool showBar) {
+    void Diagnostic::printIndent(std::ostream& out, unsigned int maxLine, bool showBar) {
         for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++)
-            std::cout << " ";
+            out << " ";
         if (showBar)
-            std::cout << color("│ ");
+            out << color("│ ");
     }
 
-    void Error::printIndentWithLineNum(unsigned int maxLine, bool showBar) {
+    void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
         auto str = " " + std::to_string(pos.line) + " ";
         while (str.size() < targetSize)
             str += " ";
-        std::cout << color(str);
+        out << color(str);
         if (showBar)
-            std::cout << color("│ ");
+            out << color("│ ");
+    }
+
+    void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int maxLine, bool showBar) {
+        printIndentWithLineNum(out, pos.line, maxLine, showBar);
+    }
+
+    std::string Diagnostic::tyToString() {
+        std::string str;
+        switch (errTy) {
+            case ERROR:   return code == "" ? "Error" : "Error(" + code + ")";
+            case WARNING: return code == "" ? "Warning" : "Warning(" + code + ")";
+            case NOTE:    return code == "" ? "Note" : "Note(" + code + ")";;
+            case HELP:    return code == "" ? "Help" : "Help(" + code + ")";;
+            default:      return code == "" ? "Internal Error" : "Internal Error(" + code + ")";
+        }
+    }
+
+    std::string Diagnostic::color(std::string str) {
+        switch (errTy) {
+            default:      return colors::bold(colors::red(str));
+            case WARNING: return colors::bold(colors::yellow(str));
+            case NOTE:    return colors::bold(colors::black(str));
+            case HELP:    return colors::bold(colors::blue(str));
+        }
     }
 }
 
