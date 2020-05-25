@@ -39,8 +39,6 @@ err.print(std::cerr);
 
 Simply copy `reporter.hpp` somewhere into to your project's directories.
 
-***
-
 ## How to Use
 
 ### Locations
@@ -70,12 +68,13 @@ auto note   = reporter::Note("a note");
 auto help   = reporter::Help("some help");
 auto intern = reporter::InternalError("an internal compiler error");
 ```
-
 The only major differences between the types are their names and their color.
 
 ![](screenshots/example3.png)
 
 ### Notes/Help
+
+You can add secondary notes/help to a diagnostic, which may be set to a specific position.
 
 ```c++
 reporter::SimpleFile file("example.cpp");
