@@ -62,11 +62,11 @@ reporter::Location loc { 1, 4, file };
 ### Diagnostic Types
 
 ```c++
-auto err    = reporter::Error("an error");
-auto warn   = reporter::Warning("a warning");
-auto note   = reporter::Note("a note");
-auto help   = reporter::Help("some help");
-auto intern = reporter::InternalError("an internal compiler error");
+auto err    = reporter::Error("an error", loc);
+auto warn   = reporter::Warning("a warning", loc);
+auto note   = reporter::Note("a note", loc);
+auto help   = reporter::Help("some help", loc);
+auto intern = reporter::InternalError("an internal compiler error", loc);
 ```
 The only major differences between the types are their names and their color.
 
