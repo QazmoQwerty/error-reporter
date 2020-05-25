@@ -114,12 +114,12 @@ namespace reporter {
      * TODO - explain
      */
     enum DiagnosticType {
-        INTERNAL_ERROR = 0,
-        ERROR          = 1,
-        WARNING        = 2,
-        NOTE           = 3,
-        HELP           = 4,
-        UNKNOWN        = 5,
+        INTERNAL_ERROR,
+        ERROR,
+        WARNING,
+        NOTE,
+        HELP,
+        UNKNOWN,
     };
 
     /**
@@ -169,25 +169,49 @@ namespace reporter {
         static std::vector<std::string> splitLines(const std::string& str);
         static std::string getLine(std::string fileName, int line);
         static bool onSameLine(Diagnostic& a, Diagnostic& b);
+        static void indent(std::ostream& out, std::string& line, unsigned int count);
 
         std::string msg;
         std::string subMsg;
         Location loc;
-        std::vector<Diagnostic> secondaries;
-
-        void sortSecondaries();
-        void showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine);
-        void printIndent(std::ostream& out, unsigned int maxLine, bool showBar = true);
-        void printIndentWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar = true);
-        void printIndentWithLineNum(std::ostream& out, unsigned int maxLine, bool showBar = true);
-        void printPaddingLine(std::ostream& out, unsigned int maxLine, unsigned int line = 0, SourceFile *file = nullptr);
-
-    protected:
         DiagnosticType errTy;
         std::string code;
+        std::vector<Diagnostic> secondaries;
+
+        // These are all the parts which are rendered by `print`:
+        //
+        //      header╶─╴│ Error(E308): a complex error
+        //         top╶─╴│   ╭─ example.cpp ─╴
+        //               │   │ 
+        //     snippet╶─╴│ 1 │ #include "reporter.hpp"
+        //   secondary╶─╴│   │ ~~~~~~~~ a relevant include
+        //     padding╶─╴│ 2 │ 
+        //     snippet╶─╴│ 3 │ int main() {
+        //   secondary╶─╴│   │            ~ curly brace
+        //     padding╶─╴│ ⋯
+        //  subMessage╶─╴│   │          this is where the error is, hence the bold red
+        //               │   │          vvvv
+        //     snippet╶─╴│ 7 │     auto file = new reporter::SimpleFile("example.cpp");
+        //             ┌╴│   │     ~~~~ ~~~~ ~               ~~~~~~~~~~                
+        //             │ │   │     │    │    │               ╰ a help message
+        // secondaries╶┤ │   │     │    │    ╰ assignment
+        //             │ │   │     │    ╰ a variable
+        //             └╴│   │     ╰ a type
+        //      bottom╶─╴│───╯
+        //   secondary╶─╴│     • Help: a general help message,
+        //               │             not set to any specific location
+
+        void sortSecondaries();
+        void printTop(std::ostream& out, SourceFile* file, unsigned int maxLine);
+        void showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine);
+        void printLeft(std::ostream& out, unsigned int maxLine, bool showBar = true);
+        void printLeftWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar = true);
+        void printPadding(std::ostream& out, unsigned int maxLine, unsigned int lastLine, unsigned int currLine, SourceFile *file);
+
         std::string tyToString();
         std::string color(std::string str);
 
+    protected:
         Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, std::string code, Location location) 
                : msg(message), subMsg(subMessage), loc(location), errTy(ty), code(code) {};
         Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, Location location) : Diagnostic(ty, message, subMessage, "", location) {};
@@ -378,95 +402,95 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
+    /* 
+        pretty print the diagnostic to `out` 
+    */
     Diagnostic& Diagnostic::print(std::ostream& out) {
+
         // find the maximum line (to know by how much to indent the bars)
         auto maxLine = loc.line;
         for (auto& secondary : secondaries)
             if (secondary.loc.line > maxLine)
                 maxLine = secondary.loc.line;
 
+        // sort the vector of secondary messages based on the order we want to be printing them 
         sortSecondaries();
-        bool showAbove = false; // if there are any messages on the line of the error, point to the error from above instead
 
-        for (size_t i = 0; !showAbove && i < secondaries.size(); i++)
-            if (onSameLine(secondaries[i], *this))
+        // by default we're pointing at the error location from below the code snippet
+        bool showAbove = false; 
+
+        // if there are any messages on the line of the error, point to the error from above instead
+        for (auto& i : secondaries)
+            if (onSameLine(i, *this)) {
                 showAbove = true;
+                break;
+            }
 
         // print the main error message
         if (msg != "")
             out << color(tyToString() + ": ") << colors::bold(msg) << "\n";
 
+        // we're finished if the diagnostic has no location
         if (loc.file == nullptr) return *this;
 
         // print the file the error is in
-        printIndent(out, maxLine, false);
-        out << color("╭─ ") << loc.file->str() << color(" ─╴") << "\n";
+        printTop(out, loc.file, maxLine);
 
-        bool isFirst = true;
-        unsigned int lastLine = 0;
-        size_t i = 0;
+        size_t i = 0; // current index in `secondaries`
+        unsigned int lastLine = 0; // the last line we rendered
 
         // first print all messages in the main file which come before the error
         while (i < secondaries.size() && secondaries[i].loc.file == loc.file && secondaries[i].loc.line < loc.line) {
             auto &secondary = secondaries[i];
-            
-            if (isFirst) {
-                printIndent(out, maxLine);
+
+            if (lastLine == 0) { // if we're rendering the first line in the file, print an empty line
+                printLeft(out, maxLine); 
                 out << "\n";
-                isFirst = false;
-            } else if (lastLine < secondary.loc.line - 1)  {
-                if (lastLine == secondary.loc.line - 2)
-                    printPaddingLine(out, maxLine, secondary.loc.line - 1, secondary.loc.file);
-                else printPaddingLine(out, maxLine);
-            }
+            } else if (lastLine < secondary.loc.line - 1)
+                printPadding(out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
+
             lastLine = secondary.loc.line;
             std::string line = getLine(loc.file->str(), secondary.loc.line);
-            printIndentWithLineNum(out, secondary.loc.line, maxLine);
+            printLeftWithLineNum(out, secondary.loc.line, maxLine);
             out << line << "\n";
             showSecondariesOnLine(out, line, i, maxLine);
         }
 
         std::string line = getLine(loc.file->str(), loc.line);
 
-        if (isFirst && !showAbove) {
-            printIndent(out, maxLine);
+        if (lastLine == 0 && !showAbove) {
+            printLeft(out, maxLine);
             out << "\n";
-        } else if (lastLine != 0 && lastLine < loc.line - 1) {
-            if (lastLine == loc.line - 2)
-                printPaddingLine(out, maxLine, loc.line - 1, loc.file);
-            else printPaddingLine(out, maxLine);
-        }
+        } else if (lastLine != 0 && lastLine < loc.line - 1)
+            printPadding(out, maxLine, lastLine, loc.line, loc.file);
         lastLine = loc.line;
         
         if (showAbove) {
             if (subMsg != "") {
                 for (auto currLine : splitLines(subMsg)) {
-                    printIndent(out, maxLine);
-                    for (unsigned int i = 0; i < loc.start; i++)
-                        out << (line[i] == '\t' ? "\t" : " ");
+                    printLeft(out, maxLine);
+                    indent(out, line, loc.start);
                     out << color(currLine);
                     out << "\n";
                 }
             }
             
-            printIndent(out, maxLine);
+            printLeft(out, maxLine);
 
-            for (unsigned int i = 0; i < loc.start; i++)
-                out << (line[i] == '\t' ? "\t" : " ");
+            indent(out, line, loc.start);
             for (unsigned int i = 0; i < loc.end - loc.start; i++)
                 out << color("v");
             out << "\n";
         }
         
-        printIndentWithLineNum(out, maxLine);
+        printLeftWithLineNum(out, loc.line, maxLine);
         out << line << "\n";
 
         if (!showAbove && subMsg != "") {
             auto split = splitLines(subMsg);
             for (size_t i = 0; i < split.size(); i++) {
-                printIndent(out, maxLine);
-                for (unsigned int i = 0; i < loc.start; i++)
-                    out << (line[i] == '\t' ? "\t" : " ");
+                printLeft(out, maxLine);
+                indent(out, line, loc.start);
                 for (unsigned int j = 0; j < loc.end - loc.start; j++)
                     out << color(i == 0 ? "^" : " ");
                 out << " ";
@@ -485,18 +509,15 @@ namespace reporter {
                 currFile = secondary.loc.file;
                 for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) out << color("─");
                 out << color("╯") << "\n";
-                printIndent(out, maxLine, false);
-                out << color("╭─ ") << currFile->str() << color(" ─╴") << "\n";
-                printIndent(out, maxLine);
+                printTop(out, currFile, maxLine);
+                printLeft(out, maxLine);
                 out << "\n";
-            } else if (lastLine == secondary.loc.line - 2)
-                printPaddingLine(out, maxLine, secondary.loc.line - 1, secondary.loc.file);
-            else if (lastLine < secondary.loc.line - 1)
-                printPaddingLine(out, maxLine);
+            } else if (lastLine < secondary.loc.line - 1)
+                printPadding(out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
             lastLine = secondary.loc.line;
             std::string line = getLine(currFile->str(), secondary.loc.line);
-            printIndentWithLineNum(out, secondary.loc.line, maxLine);
+            printLeftWithLineNum(out, secondary.loc.line, maxLine);
             out << line << "\n";
             showSecondariesOnLine(out, line, i, maxLine);
         }
@@ -505,12 +526,12 @@ namespace reporter {
         out << color("╯") << "\n"; 
         for (; i < secondaries.size(); i++) {
             auto& secondary = secondaries[i];
-            printIndent(out, maxLine, false);
+            printLeft(out, maxLine, false);
             out << secondary.color("• " + secondary.tyToString() + secondary.color(": "));
             auto lines = splitLines(secondary.subMsg);
             for (size_t idx = 0; idx < lines.size(); idx++) {
                 if (idx != 0) {
-                    printIndent(out, maxLine, false);
+                    printLeft(out, maxLine, false);
                     for (size_t j = 0; j < secondary.tyToString().size() + 4; j++)
                         out << " ";
                 }
@@ -525,7 +546,7 @@ namespace reporter {
     /* show all the secondary messages on the current line */
     void Diagnostic::showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine) {
         auto &first = secondaries[i];
-        printIndent(out, maxLine);
+        printLeft(out, maxLine);
         if (i + 1 >= secondaries.size() || !onSameLine(first, secondaries[i + 1])) {
             // only one secondary concerning this line
             for (size_t idx = 0; idx < first.loc.start; idx++)
@@ -535,7 +556,7 @@ namespace reporter {
             auto lines = splitLines(first.subMsg);
             for (size_t idx = 0; idx < lines.size(); idx++) {
                 if (idx != 0) {
-                    printIndent(out, maxLine);
+                    printLeft(out, maxLine);
                     for (size_t j = 0; j < first.loc.end; j++)
                         out << (line[j] == '\t' ? '\t' : ' ');
                 }
@@ -554,7 +575,7 @@ namespace reporter {
             }
             out << "\n";
             for (; i < secondaries.size() && onSameLine(secondaries[i], first); i++) {
-                printIndent(out, maxLine);
+                printLeft(out, maxLine);
                 for (size_t j = 0; j < secondaries[i].loc.start; j++) {
                     bool b = false;
                     for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
@@ -569,7 +590,7 @@ namespace reporter {
                     if (idx == 0)
                         out << secondaries[i].color("╰ ") << secondaries[i].color(lines[idx]) << "\n";
                     else {
-                        printIndent(out, maxLine);
+                        printLeft(out, maxLine);
                         for (size_t j = 0; j < secondaries[i].loc.start; j++) {
                             bool b = false;
 
@@ -615,27 +636,25 @@ namespace reporter {
     /////////////////////////////////////////////////////////////////////////
 
     /* a 'padding' line is an irrelevant line in between two other relevant lines */
-    void Diagnostic::printPaddingLine(std::ostream& out, unsigned int maxLine, unsigned int line, SourceFile *file) {
+    void Diagnostic::printPadding(std::ostream& out, unsigned int maxLine, unsigned int lastLine, unsigned int currLine, SourceFile *file) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
-        if (line == 0) {
+        if (lastLine + 2 == currLine) {
+            auto str = " " + std::to_string(currLine - 1) + " ";
+            while (str.size() < targetSize)
+                str += " ";
+            str += "│ ";
+            out << color(str) << getLine(file->str(), currLine - 1) << "\n";            
+        } else {
             switch (targetSize) {
                 case 3:  out << " " << color("⋯") << "\n"; break;
                 case 4:  out << " " << color("··") << "\n"; break;
                 default: out << " " << color("···") << "\n"; break;
             }   
-        } else {
-            auto str = " " + std::to_string(line) + " ";
-            while (str.size() < targetSize)
-                str += " ";
-            str += "│ ";
-            out << color(str);
-            if (file) out << getLine(file->str(), line);
-            out << "\n";
         }
     }
 
     /* prints the bars on the left with the correct indentation */
-    void Diagnostic::printIndent(std::ostream& out, unsigned int maxLine, bool showBar) {
+    void Diagnostic::printLeft(std::ostream& out, unsigned int maxLine, bool showBar) {
         for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++)
             out << " ";
         if (showBar)
@@ -644,8 +663,13 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
+    void Diagnostic::printTop(std::ostream& out, SourceFile* file, unsigned int maxLine) {
+        printLeft(out, maxLine, false);
+        out << color("╭─ ") << file->str() << color(" ─╴") << "\n";
+    }
+
     /* prints the bars on the left with the correct indentation + with the line number */
-    void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar) {
+    void Diagnostic::printLeftWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar) {
         unsigned int targetSize = std::to_string(maxLine).size() + 2;
         auto str = " " + std::to_string(lineNum) + " ";
         while (str.size() < targetSize)
@@ -655,9 +679,9 @@ namespace reporter {
             out << color("│ ");
     }
 
-    /* prints the bars on the left with the correct indentation + with the line number */
-    void Diagnostic::printIndentWithLineNum(std::ostream& out, unsigned int maxLine, bool showBar) {
-        printIndentWithLineNum(out, loc.line, maxLine, showBar);
+    void Diagnostic::indent(std::ostream& out, std::string& line, unsigned int count) {
+        for (unsigned int i = 0; i < count; i++)
+            out << (line[i] == '\t' ? "\t" : " ");
     }
 
     /////////////////////////////////////////////////////////////////////////
