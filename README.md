@@ -57,10 +57,11 @@ err.print(std::cerr);
 ### Diagnostic Types
 
 ```c++
-auto err  = reporter::Error("an error");
-auto warn = reporter::Warning("a warning");
-auto note = reporter::Note("a note");
-auto help = reporter::Help("some help");
+auto err    = reporter::Error("an error");
+auto warn   = reporter::Warning("a warning");
+auto note   = reporter::Note("a note");
+auto help   = reporter::Help("some help");
+auto intern = reporter::InternalError("an internal compiler error");
 ```
 
 The only major differences between the types are their names and their color.
@@ -88,9 +89,9 @@ reporter::Location loc { 1, 4, file };
 ```c++
 reporter::SimpleFile file("example.cpp");
 reporter::Error("an error", { 2, 3, 5, &file })
-    .withNote("a note with a location" { 2, 7, 10, &file })
+    .withNote("a note with a location", { 2, 7, 10, &file })
     .withNote("a note without a location")
-    .withHelp("help with a location" { 2, 2, &file })
+    .withHelp("help with a location", { 2, 2, &file })
     .withHelp("help without a location");
     .print(std::cerr);
 ```
