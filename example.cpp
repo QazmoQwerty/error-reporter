@@ -18,10 +18,8 @@ int main() {
                   "large number of lines", { 4, 9, 13, file })
         .withHelp("a help message", { 4, 30, 40, file })
 
-        .withHelp("a help message", { 7, 30, 40, file })
-
-        // .withNote("relevant include in another file\n"
-        //           "with another line\nand another", {26, 0, 8, file2})
+        .withNote("relevant include in another file\n"
+                  "with another line\nand another", {26, 0, 8, file2})
         
         .withHelp("a general help message,\nnot set to any specific location")
         .withNote("can also be a note");

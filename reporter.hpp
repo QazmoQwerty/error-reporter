@@ -20,8 +20,8 @@
  * SOFTWARE.
 */
 
-#ifndef ERROR_REPORTER_HPP_INCLUDED
-#define ERROR_REPORTER_HPP_INCLUDED
+#ifndef DIAGNOSTIC_REPORTER_HPP_INCLUDED
+#define DIAGNOSTIC_REPORTER_HPP_INCLUDED
 
 #include <iostream>
 #include <string>
@@ -203,6 +203,7 @@ namespace reporter {
 
         void sortSecondaries();
         void printTop(std::ostream& out, SourceFile* file, unsigned int maxLine);
+        void printBottom(std::ostream& out, unsigned int maxLine);
         void showSecondariesOnLine(std::ostream& out, std::string &line, size_t &i, unsigned int maxLine);
         void printLeft(std::ostream& out, unsigned int maxLine, bool showBar = true);
         void printLeftWithLineNum(std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool showBar = true);
@@ -334,6 +335,12 @@ namespace reporter {
     };
 
     /////////////////////////////////////////////////////////////////////////
+
+    /**
+     * An `internal error` diagnostic type. 
+     * These should (ideally) never be shown to the client, rather they should be used as a debugging tool for the compiler developer.
+     */
+    typedef DiagnosticTy<INTERNAL_ERROR> InternalError;
 
     /**
      * An `error` diagnostic type. 
@@ -507,8 +514,7 @@ namespace reporter {
 
             if (secondary.loc.file->str() != currFile->str()) {
                 currFile = secondary.loc.file;
-                for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) out << color("─");
-                out << color("╯") << "\n";
+                printBottom(out, maxLine);
                 printTop(out, currFile, maxLine);
                 printLeft(out, maxLine);
                 out << "\n";
@@ -522,8 +528,7 @@ namespace reporter {
             showSecondariesOnLine(out, line, i, maxLine);
         }
 
-        for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) out << color("─");
-        out << color("╯") << "\n"; 
+        printBottom(out, maxLine); 
         for (; i < secondaries.size(); i++) {
             auto& secondary = secondaries[i];
             printLeft(out, maxLine, false);
@@ -661,11 +666,17 @@ namespace reporter {
             out << color("│ ");
     }
 
-    /////////////////////////////////////////////////////////////////////////
-
+    /* prints the `╭─ file.xyz ─╴` at the start of the file's diagnostics */
     void Diagnostic::printTop(std::ostream& out, SourceFile* file, unsigned int maxLine) {
         printLeft(out, maxLine, false);
         out << color("╭─ ") << file->str() << color(" ─╴") << "\n";
+    }
+
+    /* prints the `──╯` at the end of the file's diagnostics */
+    void Diagnostic::printBottom(std::ostream& out, unsigned int maxLine) {
+        for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) 
+            out << color("─");
+        out << color("╯") << "\n";
     }
 
     /* prints the bars on the left with the correct indentation + with the line number */
@@ -679,6 +690,7 @@ namespace reporter {
             out << color("│ ");
     }
 
+    /* prints `count` lines of whitespace */
     void Diagnostic::indent(std::ostream& out, std::string& line, unsigned int count) {
         for (unsigned int i = 0; i < count; i++)
             out << (line[i] == '\t' ? "\t" : " ");
@@ -707,4 +719,4 @@ namespace reporter {
     }
 }
 
-#endif /* ERROR_REPORTER_HPP_INCLUDED */
+#endif /* DIAGNOSTIC_REPORTER_HPP_INCLUDED */
