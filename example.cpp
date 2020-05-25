@@ -25,6 +25,25 @@ int main() {
         .withNote("can also be a note");
 
     err.print(std::cerr);
+
+    std::cerr << "\n\n";
+
+    reporter::SimpleFile file3("example.cpp");
+    reporter::Error("an error", "here", { 4, 14, &file3 })
+        .withHelp("help without a location")
+        .withNote("a note without a location")
+        .withNote("a note with a location", { 4, 14, 10, &file3 })
+        .withHelp("help with a location", { 4, 4, 9, &file3 })
+        .print(std::cerr);
+
+    std::cerr << "\n\n";
+
+    auto err2    = reporter::Error("an error", "here", { 4, 14, &file3 }).print(std::cerr);
+    auto warn   = reporter::Warning("a warning", "here", { 4, 14, &file3 }).print(std::cerr);
+    auto note   = reporter::Note("a note", "here", { 4, 14, &file3 }).print(std::cerr);
+    auto help   = reporter::Help("some help", "here", { 4, 14, &file3 }).print(std::cerr);
+    auto intern = reporter::InternalError("an internal compiler error", "here", { 4, 14, &file3 }).print(std::cerr);
+
     delete file;
     delete file2;
     return 0;

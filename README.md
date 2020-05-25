@@ -4,9 +4,9 @@ A simple implementation for pretty, Rust-style error diagnostics.
 
 Used for the Dino compiler.
 
-![](example.png)
+![](screenshots/example.png)
 
-## Example
+### TL;DR - Example
 
 ```c++
 auto file = new reporter::SimpleFile("example.cpp");
@@ -39,32 +39,9 @@ err.print(std::cerr);
 
 Simply copy `reporter.hpp` somewhere into to your project's directories.
 
+***
 
 ## How to Use
-
-### Simple Usage
-
-```c++
-auto err = reporter::Error(
-        "an error", "with a submessage", 
-        {3, 4, 6, new reporter::SimpleFile("example.cpp") }
-    )
-    .withNote("and a note");
-
-err.print(std::cerr);
-```
-
-### Diagnostic Types
-
-```c++
-auto err    = reporter::Error("an error");
-auto warn   = reporter::Warning("a warning");
-auto note   = reporter::Note("a note");
-auto help   = reporter::Help("some help");
-auto intern = reporter::InternalError("an internal compiler error");
-```
-
-The only major differences between the types are their names and their color.
 
 ### Locations
 
@@ -84,14 +61,30 @@ You can also exclude `end` to simply get a location pointing at one specific cha
 reporter::Location loc { 1, 4, file };
 ```
 
+### Diagnostic Types
+
+```c++
+auto err    = reporter::Error("an error");
+auto warn   = reporter::Warning("a warning");
+auto note   = reporter::Note("a note");
+auto help   = reporter::Help("some help");
+auto intern = reporter::InternalError("an internal compiler error");
+```
+
+The only major differences between the types are their names and their color.
+
+![](screenshots/example3.png)
+
 ### Notes/Help
 
 ```c++
 reporter::SimpleFile file("example.cpp");
-reporter::Error("an error", { 2, 3, 5, &file })
-    .withNote("a note with a location", { 2, 7, 10, &file })
+reporter::Error("an error", "here", { 4, 14, &file })
+    .withHelp("help without a location")
     .withNote("a note without a location")
-    .withHelp("help with a location", { 2, 2, &file })
-    .withHelp("help without a location");
+    .withNote("a note with a location", { 4, 14, 10, &file })
+    .withHelp("help with a location", { 4, 4, 9, &file })
     .print(std::cerr);
 ```
+
+![](screenshots/example2.png)
