@@ -62,14 +62,14 @@ namespace reporter {
              * @param code the ANSI escape code corresponding to this color.
              */
             Color(uint8_t fg, uint8_t bg) : fg(fg), bg(bg), attributes(0) {}
-
             Color(uint8_t fg, uint8_t bg, uint8_t attributes) : fg(fg), bg(bg), attributes(attributes) {}
-
             Color(const Color color, uint8_t attributes) : fg(color.fg), bg(color.bg), attributes(color.attributes | attributes) {}
 
-            Color with(uint8_t attributes) const { return Color(*this, attributes); }
+            Color with(uint8_t attributes) const {
+                return Color(*this, attributes);
+            }
 
-            Color with(const Color color) const { 
+            Color with(const Color color) const {
                 return Color(
                     color.fg ? color.fg : fg,
                     color.bg ? color.bg : bg,
@@ -82,7 +82,7 @@ namespace reporter {
             }
 
             /** 
-             * Colors a string using an ANSI escape sequence based on _color, to be displayed in the terminal.
+             * Colors a string using an ANSI escape sequence, to be displayed in the terminal.
              * @param str string to be colored.
              * @return the colored string.
              */
@@ -225,6 +225,11 @@ namespace reporter {
             colors::Color note = colors::fgblack & colors::bold;
             colors::Color help = colors::fgblue & colors::bold;
         } colors;
+        
+        struct {
+            uint8_t left = 1;
+            uint8_t right = 1;
+        } lineNumPadding;
 
         Config() : style(DisplayStyle::RICH), tabWidth(4) { }
         Config(DisplayStyle style, unsigned int tabWidth) : style(style), tabWidth(tabWidth) {}
@@ -377,9 +382,9 @@ namespace reporter {
         
         /* a 'padding' line is an irrelevant line in between two other relevant lines */
         void printPadding(const Config& config, std::ostream& out, unsigned int maxLine, unsigned int lastLine, unsigned int currLine, SourceFile *file) {
-            unsigned int targetSize = std::to_string(maxLine).size() + 2;
+            unsigned int targetSize = std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right;
             if (lastLine + 2 == currLine) {
-                auto str = " " + std::to_string(currLine - 1) + " ";
+                auto str = std::string(config.lineNumPadding.left, ' ') + std::to_string(currLine - 1) + std::string(config.lineNumPadding.right, ' ');
                 while (str.size() < targetSize)
                     str += " ";
                 str += "│ ";
@@ -395,8 +400,7 @@ namespace reporter {
 
         /* prints the bars on the left with the correct indentation */
         void printLeft(const Config& config, std::ostream& out, unsigned int maxLine, bool printBar = true) {
-            for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++)
-                out << " ";
+            out << std::string(std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right, ' ');
             if (printBar)
                 out << color(config, "│ ");
         }
@@ -409,15 +413,15 @@ namespace reporter {
 
         /* prints the `──╯` at the end of the file's diagnostics */
         void printBottom(const Config& config, std::ostream& out, unsigned int maxLine) {
-            for (unsigned int i = 0; i < std::to_string(maxLine).size() + 2; i++) 
+            for (unsigned int i = 0; i < std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right; i++) 
                 out << color(config, "─");
             out << color(config, "╯") << "\n";
         }
 
         /* prints the bars on the left with the correct indentation + with the line number */
         void printLeftWithLineNum(const Config& config, std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool printBar = true) {
-            unsigned int targetSize = std::to_string(maxLine).size() + 2;
-            auto str = " " + std::to_string(lineNum) + " ";
+            unsigned int targetSize = std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right;
+            auto str = std::string(config.lineNumPadding.left, ' ') + std::to_string(lineNum) + std::string(config.lineNumPadding.right, ' ');
             while (str.size() < targetSize)
                 str += " ";
             out << color(config, str);
