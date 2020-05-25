@@ -88,6 +88,8 @@ namespace reporter {
          * @return file path to be opened and dispayed by the reporter.
          */
         virtual std::string str() = 0;
+
+        virtual ~SourceFile() {}; 
     };
 
     /**
@@ -100,12 +102,12 @@ namespace reporter {
         /**
          * @param path path to the source file.
          */
-        SimpleFile(std::string path) : _path(path) {};
+        SimpleFile(std::string path) : _path(path) {}
 
         /**
          * @return path to the source file.
          */
-        std::string str() { return _path; };
+        std::string str() { return _path; }
     };
 
     /////////////////////////////////////////////////////////////////////////
