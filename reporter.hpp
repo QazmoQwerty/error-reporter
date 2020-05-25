@@ -232,6 +232,17 @@ namespace reporter {
                 out << (line[i] == '\t' ? "\t" : " ");
         }
 
+        static std::string getUnderline(unsigned char level) {
+            switch (level) {
+                case 0: return " ";
+                case 1: return "~";
+                case 2: return "=";
+                case 3: return "#";
+                case 4: return "*";
+                default: return level%2 ? "-" : "+";
+            }
+        }
+
         std::string tyToString() {
             std::string str;
             switch (errTy) {
@@ -336,7 +347,7 @@ namespace reporter {
                 for (size_t idx = 0; idx < first.loc.start; idx++)
                     out << (line[idx] == '\t' ? '\t' : ' ');
                 for (size_t idx = 0; idx < first.loc.end - first.loc.start; idx++)
-                    out << first.color("~");
+                    out << first.color(getUnderline(1));
                 auto lines = splitLines(first.subMsg);
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
@@ -349,13 +360,11 @@ namespace reporter {
                 i++;
             } else {
                 for (size_t lineIdx = 0; lineIdx < line.size(); lineIdx++) {
-                    bool b = false;
-                    for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
-                        if (secondaries[idx].loc.start <= lineIdx && lineIdx < secondaries[idx].loc.end) {
-                            out << secondaries[idx].color("~");
-                            b = true;
-                        }
-                    if (!b) out << " ";
+                    unsigned char count = 0;
+                    for (auto idx = i; idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
+                        if (secondaries[idx].loc.start <= lineIdx && lineIdx < secondaries[idx].loc.end)
+                            count++;
+                    out << getUnderline(count);
                 }
                 out << "\n";
                 for (; i < secondaries.size() && onSameLine(secondaries[i], first); i++) {

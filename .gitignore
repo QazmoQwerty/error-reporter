@@ -4,3 +4,4 @@ test
 *.exe
 .vscode
 doxy
+test.cpp
