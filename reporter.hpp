@@ -239,8 +239,8 @@ namespace reporter {
             std::string internalErrorName = "Internal Error";
             std::string beforeFileName  = "╭─ ";
             std::string afterFileName   = " ─╴";
-            wchar_t errCodeBracketLeft  = L'[';
-            wchar_t errCodeBracketRight = L']';
+            wchar_t errCodeBracketLeft  = L'(';
+            wchar_t errCodeBracketRight = L')';
             wchar_t borderVertical      = L'│';
             wchar_t borderHorizontal    = L'─';
             wchar_t borderBottomRight   = L'╯';
