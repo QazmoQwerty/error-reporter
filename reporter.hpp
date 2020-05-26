@@ -40,19 +40,21 @@ namespace reporter {
      */
     namespace colors {
         namespace attributes {
-            const unsigned char bold      = 1 << 0;
-            const unsigned char weak      = 1 << 1;
-            const unsigned char italic    = 1 << 2;
-            const unsigned char underline = 1 << 3;
-            const unsigned char blink     = 1 << 4;
-            const unsigned char reverse   = 1 << 5;
-            const unsigned char cross     = 1 << 6;
-            const unsigned char inherit   = 1 << 7;
+            const uint8_t bold      = 1 << 0;
+            const uint8_t weak      = 1 << 1;
+            const uint8_t italic    = 1 << 2;
+            const uint8_t underline = 1 << 3;
+            const uint8_t blink     = 1 << 4;
+            const uint8_t reverse   = 1 << 5;
+            const uint8_t cross     = 1 << 6;
+
+            // Inherit is used to tell the reporter to use the diagnostic's type's color.
+            const uint8_t inherit   = 1 << 7;
         };
 
         /**
          * Utility class which represents a terminal color.
-         * @note 'color' can mean both "red/green" and "bold/italic".
+         * @note "color" can mean both "red/green" and "bold/italic".
          */ 
         class Color {
             uint8_t fg, bg, attributes;
@@ -188,9 +190,9 @@ namespace reporter {
      */
     class Location {
     public:
-        unsigned int line;  /// line in the file (line count starts at 1).  
-        unsigned int start; /// index of the first character of the line to be included (starts at 0).
-        unsigned int end;   /// index of the first character of the line to be excluded (starts at 0).
+        uint32_t line;  /// line in the file (line count starts at 1).  
+        uint32_t start; /// index of the first character of the line to be included (starts at 0).
+        uint32_t end;   /// index of the first character of the line to be excluded (starts at 0).
         SourceFile* file;   /// file this location is in.
 
         /** 
@@ -200,7 +202,7 @@ namespace reporter {
          * @param end index of the first character of the line to be excluded (starts at 0).
          * @param file file this location is in.
          */
-        Location(unsigned int line, unsigned int start, unsigned int end, SourceFile* file)
+        Location(uint32_t line, uint32_t start, uint32_t end, SourceFile* file)
                 : line(line), start(start), end(end), file(file) {
             if (this->end <= this->start)
                 this->end = this->start + 1;
@@ -212,7 +214,7 @@ namespace reporter {
          * @param loc index of the only character of the line to be included (starts at 0).
          * @param file file this location is in.
          */
-        Location(unsigned int line, unsigned int loc, SourceFile* file) : Location(line, loc, loc + 1, file) {}
+        Location(uint32_t line, uint32_t loc, SourceFile* file) : Location(line, loc, loc + 1, file) {}
 
         /**
          * Constructs a non-location
@@ -226,7 +228,7 @@ namespace reporter {
     class Config {
     public:
         DisplayStyle style;
-        unsigned int tabWidth;
+        uint32_t tabWidth;
         struct {
             colors::Color error = colors::fgred & colors::bold;
             colors::Color warning = colors::fgyellow & colors::bold;
@@ -271,7 +273,7 @@ namespace reporter {
         } chars;
 
         Config() : style(DisplayStyle::RICH), tabWidth(4) { }
-        Config(DisplayStyle style, unsigned int tabWidth) : style(style), tabWidth(tabWidth) {}
+        Config(DisplayStyle style, uint32_t tabWidth) : style(style), tabWidth(tabWidth) {}
 
         static const Config& getDefault() {
             static const Config ret = Config();
@@ -361,8 +363,8 @@ namespace reporter {
         }
 
         /* prints `count` lines of whitespace */
-        static void indent(const Config& config, std::ostream& out, std::string& line, unsigned int count) {
-            for (unsigned int i = 0; i < count; i++)
+        static void indent(const Config& config, std::ostream& out, std::string& line, uint32_t count) {
+            for (uint32_t i = 0; i < count; i++)
                 out << (line[i] == '\t' ? std::string(config.tabWidth, ' ') : " ");
         }
 
@@ -379,7 +381,7 @@ namespace reporter {
             out << replaceAll(line, "\t", std::string(config.tabWidth, ' ')) << "\n";
         }
 
-        static std::string getUnderline(const Config& config, unsigned char level) {
+        static std::string getUnderline(const Config& config, uint8_t level) {
             switch (level) {
                 case 0: return " ";
                 case 1: return toString(config.chars.underline1);
@@ -444,8 +446,8 @@ namespace reporter {
         }
         
         /* a 'padding' line is an irrelevant line in between two other relevant lines */
-        void printPadding(const Config& config, std::ostream& out, unsigned int maxLine, unsigned int lastLine, unsigned int currLine, SourceFile *file) {
-            unsigned int targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
+        void printPadding(const Config& config, std::ostream& out, uint32_t maxLine, uint32_t lastLine, uint32_t currLine, SourceFile *file) {
+            uint32_t targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
             if (lastLine + 2 == currLine) {
                 auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(currLine - 1) + std::string(config.padding.afterLineNum, ' ');
                 while (str.size() < targetSize)
@@ -462,21 +464,21 @@ namespace reporter {
         }
 
         /* prints the bars on the left with the correct indentation */
-        void printLeft(const Config& config, std::ostream& out, unsigned int maxLine, bool printBar = true) {
+        void printLeft(const Config& config, std::ostream& out, uint32_t maxLine, bool printBar = true) {
             out << std::string(std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum, ' ');
             if (printBar)
                 out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
         }
 
         /* prints the `╭─ file.xyz ─╴` at the start of the file's diagnostics */
-        void printTop(const Config& config, std::ostream& out, SourceFile* file, unsigned int maxLine) {
+        void printTop(const Config& config, std::ostream& out, SourceFile* file, uint32_t maxLine) {
             printLeft(config, out, maxLine, false);
             out << maybeInherit(config, config.colors.border)(config.chars.beforeFileName) 
                 << file->str() << maybeInherit(config, config.colors.border)(config.chars.afterFileName) << "\n";
         }
 
         /* prints the border at the end of the file's diagnostics */
-        void printBottom(const Config& config, std::ostream& out, unsigned int maxLine) {
+        void printBottom(const Config& config, std::ostream& out, uint32_t maxLine) {
             for (uint8_t i = 0; i < config.padding.borderBottom; i++) {
                 printLeft(config, out, maxLine);
                 out << "\n";
@@ -487,8 +489,8 @@ namespace reporter {
         }
 
         /* prints the bars on the left with the correct indentation + with the line number */
-        void printLeftWithLineNum(const Config& config, std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool printBar = true) {
-            unsigned int targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
+        void printLeftWithLineNum(const Config& config, std::ostream& out, uint32_t lineNum, uint32_t maxLine, bool printBar = true) {
+            uint32_t targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
             auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(lineNum) + std::string(config.padding.afterLineNum, ' ');
             while (str.size() < targetSize)
                 str += " ";
@@ -498,7 +500,7 @@ namespace reporter {
         }
 
         /* prints all secondary messages on the current line */
-        void printSecondariesOnLine(const Config& config, std::ostream& out, std::string &line, size_t &i, unsigned int maxLine) {
+        void printSecondariesOnLine(const Config& config, std::ostream& out, std::string &line, size_t &i, uint32_t maxLine) {
             auto &first = secondaries[i];
             printLeft(config, out, maxLine);
             if (i + 1 >= secondaries.size() || !onSameLine(first, secondaries[i + 1])) {
@@ -518,7 +520,7 @@ namespace reporter {
                 i++;
             } else {
                 for (size_t lineIdx = 0; lineIdx < line.size(); lineIdx++) {
-                    unsigned char count = 0;
+                    uint8_t count = 0;
                     Diagnostic* firstFound = nullptr;
                     for (auto idx = i; idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
                         if (secondaries[idx].loc.start <= lineIdx && lineIdx < secondaries[idx].loc.end) {
@@ -616,7 +618,7 @@ namespace reporter {
                 out << color(config)(tyToString(config) + ": ") << maybeInherit(config, config.colors.message)(msg) << "\n";
 
             size_t i = 0; // current index in `secondaries`
-            unsigned int lastLine = 0; // the last line we rendered
+            uint32_t lastLine = 0; // the last line we rendered
             std::string line = ""; // the snippet we're going to print
 
             // skip to after the diagnostic's location is printed if it has no location 
@@ -670,7 +672,7 @@ namespace reporter {
                 printLeft(config, out, maxLine);
 
                 indent(config, out, line, loc.start);
-                for (unsigned int i = 0; i < loc.end - loc.start; i++)
+                for (uint32_t i = 0; i < loc.end - loc.start; i++)
                     out << color(config)(toString(config.chars.arrowDown));
                 out << "\n";
             }
@@ -683,7 +685,7 @@ namespace reporter {
                 for (size_t i = 0; i < split.size(); i++) {
                     printLeft(config, out, maxLine);
                     indent(config, out, line, loc.start);
-                    for (unsigned int j = 0; j < loc.end - loc.start; j++)
+                    for (uint32_t j = 0; j < loc.end - loc.start; j++)
                         out << color(config)(i == 0 ? toString(config.chars.arrowUp) : " ");
                     out << " ";
                     out << color(config)(split[i]) << "\n";
