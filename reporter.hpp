@@ -39,6 +39,8 @@ namespace reporter {
      * Utility namespace which deals with terminal colors.
      */
     namespace colors {
+
+        /* font style attributes (bold/italic/etc.) */
         namespace attributes {
             const uint8_t bold      = 1 << 0;
             const uint8_t weak      = 1 << 1;
@@ -48,7 +50,7 @@ namespace reporter {
             const uint8_t reverse   = 1 << 5;
             const uint8_t cross     = 1 << 6;
 
-            // Inherit is used to tell the reporter to use the diagnostic's type's color.
+            // inherit is used to tell the reporter to use the diagnostic's type's color.
             const uint8_t inherit   = 1 << 7;
         };
 
@@ -57,21 +59,32 @@ namespace reporter {
          * @note "color" can mean both "red/green" and "bold/italic".
          */ 
         class Color {
-            uint8_t fg, bg, attributes;
+            uint8_t fg; // foreground color (ansi codes 30-37)
+            uint8_t bg; // background color (ansi codes 40-47)
+            uint8_t attributes;
         public:
             Color() : fg(0), bg(0), attributes(0) {}
-
-            /** 
-             * @param code the ANSI escape code corresponding to this color.
-             */
             Color(uint8_t fg, uint8_t bg) : fg(fg), bg(bg), attributes(0) {}
             Color(uint8_t fg, uint8_t bg, uint8_t attributes) : fg(fg), bg(bg), attributes(attributes) {}
             Color(const Color color, uint8_t attributes) : fg(color.fg), bg(color.bg), attributes(color.attributes | attributes) {}
 
+            /** 
+             * @return this color, in addition with the specified attributes.
+             */
             Color with(uint8_t attributes) const {
                 return Color(*this, attributes);
             }
 
+            /** 
+             * @return this color, in addition with the specified attributes.
+             */
+            Color operator&(uint8_t attributes) const {
+                return with(attributes);
+            }
+
+            /** 
+             * @return this color, with `color`'s foreground, background, and attributes. Any unspecified options will remain unchanged.
+             */
             Color with(const Color color) const {
                 return Color(
                     color.fg ? color.fg : fg,
@@ -80,10 +93,17 @@ namespace reporter {
                 );
             }
 
+            /** 
+             * @return this color, with `color`'s foreground, background, and attributes. Any unspecified options will remain unchanged.
+             */
             Color operator&(const Color color) const {
                 return with(color);
             }
 
+            /** 
+             * Check color equality.
+             * @return true if background color, foreground color, and attributes are the same.
+             */
             bool operator==(const Color color) const {
                 return bg == color.bg &&
                        fg == color.fg &&
@@ -107,15 +127,15 @@ namespace reporter {
                 return str;
             }
         };
-        const Color none;
-        const Color inherit   (none, attributes::inherit);
 
-        const Color bold      (none, attributes::bold);
-        const Color weak      (none, attributes::weak);
-        const Color italic    (none, attributes::italic);
-        const Color underline (none, attributes::underline);
-        const Color blink     (none, attributes::blink);
-        const Color reverse   (none, attributes::reverse);
+        const Color none; // default terminal color
+        const Color inherit   = none & attributes::inherit; // inherit is used to tell the reporter to use the diagnostic's type's color
+        const Color bold      = none & attributes::bold;
+        const Color weak      = none & attributes::weak;
+        const Color italic    = none & attributes::italic;
+        const Color underline = none & attributes::underline;
+        const Color blink     = none & attributes::blink;
+        const Color reverse   = none & attributes::reverse;
 
         const Color fgblack   (30, 0);
         const Color fgred     (31, 0);
@@ -175,7 +195,7 @@ namespace reporter {
     /**
      * TODO - explain
      */
-    enum DiagnosticType {
+    enum class DiagnosticType {
         INTERNAL_ERROR,
         ERROR,
         WARNING,
@@ -223,8 +243,23 @@ namespace reporter {
         Location() : Location(0, 0, 0, nullptr) {}
     };
 
+    /**
+     * RICH:
+     *     Error(E308): a rich error
+     *        ╭─ test.cpp ─╴
+     *        │ 
+     *      4 │     int n = 10;
+     *        │     ^^^ a submessage
+     *     ───╯
+     * 
+     * SHORT:
+     *     test.cpp:4:4:7: Error(E308): a rich error
+     */
     enum class DisplayStyle { RICH, SHORT };
 
+    /**
+     * TODO - explain
+     */
     class Config {
     public:
         DisplayStyle style;
@@ -239,12 +274,22 @@ namespace reporter {
         } colors;
         
 
-        /*
-             26 │ #include <iostream>
-            ~  ~ ~
-            │
-        */
         struct {
+            /*
+                    ╭─ file.xyz ─
+                    │ ┐
+                    │ ├─ borderTop
+                    │ ┘
+               17   │   int n = 20
+            └┬┘  └┬┘│└┬┘
+             │    │ │ ╰ borderLeft
+             │    ╰ afterLineNum
+             ╰ beforeLineNum
+                    │ ┐
+                    │ ├─ borderBottom
+                    │ ┘
+                 ───╯
+            */
             uint8_t beforeLineNum = 1;
             uint8_t afterLineNum = 1;
             uint8_t borderTop = 1;
@@ -258,16 +303,21 @@ namespace reporter {
             std::string noteName = "Note";
             std::string helpName = "Help";
             std::string internalErrorName = "Internal Error";
-            std::string beforeFileName  = "╭─ ";
-            std::string afterFileName   = " ─╴";
+
             wchar_t errCodeBracketLeft  = L'(';
             wchar_t errCodeBracketRight = L')';
+
+            std::string beforeFileName  = "╭─ ";
+            std::string afterFileName   = " ─╴";
+
             wchar_t borderVertical      = L'│';
             wchar_t borderHorizontal    = L'─';
             wchar_t borderBottomRight   = L'╯';
             wchar_t noteBullet          = L'•';
+
             wchar_t lineVertical        = L'│';
             std::string lineBottomLeft  = "╰ ";
+
             wchar_t arrowDown           = L'v';
             wchar_t arrowUp             = L'^';
             wchar_t underline1          = L'~';
@@ -406,10 +456,10 @@ namespace reporter {
         std::string tyToString(const Config& config) {
             std::string str;
             switch (errTy) {
-                case ERROR:   str = config.chars.errorName;         break;
-                case WARNING: str = config.chars.warningName;       break;
-                case NOTE:    str = config.chars.noteName;          break;
-                case HELP:    str = config.chars.helpName;          break;
+                case DiagnosticType::ERROR:   str = config.chars.errorName;         break;
+                case DiagnosticType::WARNING: str = config.chars.warningName;       break;
+                case DiagnosticType::NOTE:    str = config.chars.noteName;          break;
+                case DiagnosticType::HELP:    str = config.chars.helpName;          break;
                 default:      str = config.chars.internalErrorName; break;
             }
             if (code != "")
@@ -421,9 +471,9 @@ namespace reporter {
         const colors::Color& color(const Config& config) {
             switch (errTy) {
                 default:      return config.colors.error;
-                case WARNING: return config.colors.warning;
-                case NOTE:    return config.colors.note;
-                case HELP:    return config.colors.help;
+                case DiagnosticType::WARNING: return config.colors.warning;
+                case DiagnosticType::NOTE:    return config.colors.note;
+                case DiagnosticType::HELP:    return config.colors.help;
             }
         }
 
@@ -676,17 +726,14 @@ namespace reporter {
                     for (auto currLine : splitLines(subMsg)) {
                         printLeft(config, out, maxLine);
                         indent(config, out, line, loc.start);
-                        out << color(config)(currLine);
-                        out << "\n";
+                        out << color(config)(currLine) << "\n";
                     }
                 }
                 
                 printLeft(config, out, maxLine);
 
                 indent(config, out, line, loc.start);
-                for (uint32_t i = 0; i < loc.end - loc.start; i++)
-                    out << color(config)(toString(config.chars.arrowDown));
-                out << "\n";
+                out << color(config)(repeat(toString(config.chars.arrowDown), loc.end - loc.start)) << "\n";
             }
             
             printLeftWithLineNum(config, out, loc.line, maxLine);
@@ -746,8 +793,7 @@ namespace reporter {
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
                         printLeft(config, out, maxLine, false);
-                        for (size_t j = 0; j < secondary.tyToString(config).size() + 4; j++)
-                            out << " ";
+                        out << std::string(secondary.tyToString(config).size() + 4, ' ');
                     }
                     printLine(config, out, lines[idx]);
                 }
@@ -868,31 +914,31 @@ namespace reporter {
      * An `internal error` diagnostic type. 
      * These should (ideally) never be shown to the client, rather they should be used as a debugging tool for the compiler developer.
      */
-    typedef DiagnosticTy<INTERNAL_ERROR> InternalError;
+    typedef DiagnosticTy<DiagnosticType::INTERNAL_ERROR> InternalError;
 
     /**
      * An `error` diagnostic type. 
      * These are usually errors which stop the compilation process from being competed.
      */
-    typedef DiagnosticTy<ERROR> Error;
+    typedef DiagnosticTy<DiagnosticType::ERROR> Error;
 
     /**
      * A `warning` diagnostic type.
      * These don't necessarily halt the compilation process, but they hint at a possible error in the programmer's code.
      */
-    typedef DiagnosticTy<WARNING> Warning;
+    typedef DiagnosticTy<DiagnosticType::WARNING> Warning;
 
     /**
      * A `note` diagnostic type.
      * Should be used to supplement the `Error`/`Warning` diagnostic, and give useful inforation to solve the issue.
      */
-    typedef DiagnosticTy<NOTE> Note;
+    typedef DiagnosticTy<DiagnosticType::NOTE> Note;
 
     /**
      * A `help` diagnostic type.
      * Usually used to give useful hints at how to fix an issue.
      */
-    typedef DiagnosticTy<HELP> Help;
+    typedef DiagnosticTy<DiagnosticType::HELP> Help;
 
     Diagnostic& Diagnostic::withNote(std::string message, Location location) { secondaries.push_back(Note("", message, location)); return *this; }
     Diagnostic& Diagnostic::withHelp(std::string message, Location location) { secondaries.push_back(Help("", message, location)); return *this; }
