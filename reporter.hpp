@@ -246,7 +246,7 @@ namespace reporter {
             wchar_t borderBottomRight   = L'╯';
             wchar_t noteBullet          = L'•';
             wchar_t lineVertical        = L'│';
-            wchar_t lineBottomLeft      = L'╰';
+            std::string lineBottomLeft  = "╰ ";
             wchar_t arrowDown           = L'v';
             wchar_t arrowUp             = L'^';
             wchar_t underline1          = L'~';
@@ -520,7 +520,7 @@ namespace reporter {
                     auto lines = splitLines(secondaries[i].subMsg);
                     for (size_t idx = 0; idx < lines.size(); idx++) {
                         if (idx == 0)
-                            out << secondaries[i].color(config, toString(config.chars.lineBottomLeft) + " " + lines[idx]) << "\n";
+                            out << secondaries[i].color(config, config.chars.lineBottomLeft + lines[idx]) << "\n";
                         else {
                             printLeft(config, out, maxLine);
                             for (size_t j = 0; j < secondaries[i].loc.start; j++) {
