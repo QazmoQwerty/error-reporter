@@ -761,7 +761,7 @@ namespace reporter {
          * @param out stream in which to print the error.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& print(std::ostream& out) { Diagnostic::print(out); return *this; };
+        DiagnosticTy<T>& print(std::ostream& out, const Config& config = Config::getDefault()) { Diagnostic::print(out, config); return *this; };
 
         /**
          * Adds a secondary note message to the diagnostic at `location`.
