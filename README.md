@@ -1,6 +1,6 @@
 # Diagnostic Reporter
 
-A simple implementation for pretty, Rust-style error diagnostics.
+A simple, single header C++ library for pretty, Rust-style error diagnostics.
 
 Used for the Dino compiler.
 
