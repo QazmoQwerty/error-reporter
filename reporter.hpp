@@ -234,10 +234,16 @@ namespace reporter {
             colors::Color warning = colors::fgyellow & colors::bold;
             colors::Color note = colors::fgblack & colors::bold;
             colors::Color help = colors::fgblue & colors::bold;
-            colors::Color message = colors::bold;
+            colors::Color message = colors::bold; // the color of the main error message
             colors::Color border = colors::inherit;
         } colors;
         
+
+        /*
+             26 │ #include <iostream>
+            ~  ~ ~
+            │
+        */
         struct {
             uint8_t beforeLineNum = 1;
             uint8_t afterLineNum = 1;
@@ -280,24 +286,6 @@ namespace reporter {
             return ret;
         }
     };
-    
-    std::string toString(wchar_t cp)
-    {
-        char c[5]={ 0x00,0x00,0x00,0x00,0x00 };
-        if     (cp<=0x7F) { c[0] = cp;  }
-        else if(cp<=0x7FF) { c[0] = (cp>>6)+192; c[1] = (cp&63)+128; }
-        else if(0xd800<=cp && cp<=0xdfff) {} //invalid block of utf8
-        else if(cp<=0xFFFF) { c[0] = (cp>>12)+224; c[1]= ((cp>>6)&63)+128; c[2]=(cp&63)+128; }
-        else if(cp<=0x10FFFF) { c[0] = (cp>>18)+240; c[1] = ((cp>>12)&63)+128; c[2] = ((cp>>6)&63)+128; c[3]=(cp&63)+128; }
-        return std::string(c);
-    }
-
-    std::string repeat(std::string s, size_t n) 
-    { 
-        std::string s1 = s; 
-        for (int i=1; i<n;i++)  s += s1;
-        return s; 
-    } 
 
     /**
      * These are all the parts which are rendered by `print`:
@@ -331,6 +319,36 @@ namespace reporter {
         DiagnosticType errTy;
         std::string code;
         std::vector<Diagnostic> secondaries;
+
+        /* unicode code point to string */
+        static std::string toString(wchar_t cp)
+        {
+            char c[5]={ 0x00,0x00,0x00,0x00,0x00 };
+            if     (cp<=0x7F) { c[0] = cp;  }
+            else if(cp<=0x7FF) { c[0] = (cp>>6)+192; c[1] = (cp&63)+128; }
+            else if(0xd800<=cp && cp<=0xdfff) {} //invalid block of utf8
+            else if(cp<=0xFFFF) { c[0] = (cp>>12)+224; c[1]= ((cp>>6)&63)+128; c[2]=(cp&63)+128; }
+            else if(cp<=0x10FFFF) { c[0] = (cp>>18)+240; c[1] = ((cp>>12)&63)+128; c[2] = ((cp>>6)&63)+128; c[3]=(cp&63)+128; }
+            return std::string(c);
+        }
+
+        /* repeat `s` `n` times */
+        static std::string repeat(std::string s, size_t n) 
+        { 
+            std::string s1 = s; 
+            for (int i=1; i<n;i++)  s += s1;
+            return s; 
+        }
+
+        /* replace all occurences of `from` in `str` with `to` */
+        static std::string replaceAll(std::string str, const std::string& from, const std::string& to) {
+            size_t start_pos = 0;
+            while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+                str.replace(start_pos, from.length(), to);
+                start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+            }
+            return str;
+        }
 
         /* returns whether the two diagnostics are on the same line */
         static bool onSameLine(Diagnostic& a, Diagnostic& b) {
@@ -368,19 +386,11 @@ namespace reporter {
                 out << (line[i] == '\t' ? std::string(config.tabWidth, ' ') : " ");
         }
 
-        static std::string replaceAll(std::string str, const std::string& from, const std::string& to) {
-            size_t start_pos = 0;
-            while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-                str.replace(start_pos, from.length(), to);
-                start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
-            }
-            return str;
-        }
-
         static void printLine(const Config& config, std::ostream& out, std::string& line) {
             out << replaceAll(line, "\t", std::string(config.tabWidth, ' ')) << "\n";
         }
 
+        /* get corresponding underline character based intensity level */
         static std::string getUnderline(const Config& config, uint8_t level) {
             switch (level) {
                 case 0: return " ";
@@ -392,6 +402,7 @@ namespace reporter {
             }
         }
 
+        /* return errTy' string representation + the error code if one exists */
         std::string tyToString(const Config& config) {
             std::string str;
             switch (errTy) {
@@ -416,6 +427,7 @@ namespace reporter {
             }
         }
 
+        /* returns errTy's color if `c` is `colors::inherit` (otherwise returns c)*/
         const colors::Color& maybeInherit(const Config& config, const colors::Color& c) {
             if (c == colors::inherit)
                 return color(config);
@@ -680,15 +692,23 @@ namespace reporter {
             printLeftWithLineNum(config, out, loc.line, maxLine);
             printLine(config, out, line);
 
-            if (!printAbove && subMsg != "") {
-                auto split = splitLines(subMsg);
-                for (size_t i = 0; i < split.size(); i++) {
-                    printLeft(config, out, maxLine);
+            if (!printAbove) {
+                printLeft(config, out, maxLine);
                     indent(config, out, line, loc.start);
-                    for (uint32_t j = 0; j < loc.end - loc.start; j++)
-                        out << color(config)(i == 0 ? toString(config.chars.arrowUp) : " ");
-                    out << " ";
-                    out << color(config)(split[i]) << "\n";
+                out << color(config)(repeat(toString(config.chars.arrowUp), loc.end - loc.start));
+                if (subMsg == "")
+                    out << "\n";
+                else {
+                    auto split = splitLines(subMsg);
+                    for (size_t i = 0; i < split.size(); i++) {
+                        if (i != 0) {
+                            printLeft(config, out, maxLine);
+                            indent(config, out, line, loc.start);
+                            out << std::string(loc.end - loc.start, ' ');
+                        }
+                        out << " ";
+                        out << color(config)(split[i]) << "\n";
+                    }
                 }
             }
         
