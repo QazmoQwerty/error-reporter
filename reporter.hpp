@@ -694,7 +694,7 @@ namespace reporter {
 
             if (!printAbove) {
                 printLeft(config, out, maxLine);
-                    indent(config, out, line, loc.start);
+                indent(config, out, line, loc.start);
                 out << color(config)(repeat(toString(config.chars.arrowUp), loc.end - loc.start));
                 if (subMsg == "")
                     out << "\n";
@@ -706,8 +706,7 @@ namespace reporter {
                             indent(config, out, line, loc.start);
                             out << std::string(loc.end - loc.start, ' ');
                         }
-                        out << " ";
-                        out << color(config)(split[i]) << "\n";
+                        out << " " << color(config)(split[i]) << "\n";
                     }
                 }
             }
