@@ -47,6 +47,7 @@ namespace reporter {
             const unsigned char blink     = 1 << 4;
             const unsigned char reverse   = 1 << 5;
             const unsigned char cross     = 1 << 6;
+            const unsigned char inherit   = 1 << 7;
         };
 
         /**
@@ -81,6 +82,12 @@ namespace reporter {
                 return with(color);
             }
 
+            bool operator==(const Color color) const {
+                return bg == color.bg &&
+                       fg == color.fg &&
+                       attributes == color.attributes;
+            }
+
             /** 
              * Colors a string using an ANSI escape sequence, to be displayed in the terminal.
              * @param str string to be colored.
@@ -99,6 +106,7 @@ namespace reporter {
             }
         };
         const Color none;
+        const Color inherit   (none, attributes::inherit);
 
         const Color bold      (none, attributes::bold);
         const Color weak      (none, attributes::weak);
@@ -225,12 +233,16 @@ namespace reporter {
             colors::Color note = colors::fgblack & colors::bold;
             colors::Color help = colors::fgblue & colors::bold;
             colors::Color message = colors::bold;
+            colors::Color border = colors::inherit;
         } colors;
         
         struct {
-            uint8_t left = 1;
-            uint8_t right = 1;
-        } lineNumPadding;
+            uint8_t beforeLineNum = 1;
+            uint8_t afterLineNum = 1;
+            uint8_t borderTop = 1;
+            uint8_t borderLeft = 1;
+            uint8_t borderBottom = 0;
+        } padding;
 
         struct {
             std::string errorName = "Error";
@@ -392,14 +404,20 @@ namespace reporter {
             else return str;
         }
 
-        /* gets a string and colors it based on `errTy`*/
-        std::string color(const Config& config, std::string str) {
+        /* returns errTy's color */
+        const colors::Color& color(const Config& config) {
             switch (errTy) {
-                default:      return config.colors.error(str);
-                case WARNING: return config.colors.warning(str);
-                case NOTE:    return config.colors.note(str);
-                case HELP:    return config.colors.help(str);
+                default:      return config.colors.error;
+                case WARNING: return config.colors.warning;
+                case NOTE:    return config.colors.note;
+                case HELP:    return config.colors.help;
             }
+        }
+
+        const colors::Color& maybeInherit(const Config& config, const colors::Color& c) {
+            if (c == colors::inherit)
+                return color(config);
+            else return c;
         }
 
         /* sort the vector of secondary messages based on the order we want to be printing them */
@@ -427,51 +445,56 @@ namespace reporter {
         
         /* a 'padding' line is an irrelevant line in between two other relevant lines */
         void printPadding(const Config& config, std::ostream& out, unsigned int maxLine, unsigned int lastLine, unsigned int currLine, SourceFile *file) {
-            unsigned int targetSize = std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right;
+            unsigned int targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
             if (lastLine + 2 == currLine) {
-                auto str = std::string(config.lineNumPadding.left, ' ') + std::to_string(currLine - 1) + std::string(config.lineNumPadding.right, ' ');
+                auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(currLine - 1) + std::string(config.padding.afterLineNum, ' ');
                 while (str.size() < targetSize)
                     str += " ";
-                str += toString(config.chars.borderVertical) + " ";
-                out << color(config, str) << getLine(file->str(), currLine - 1) << "\n";            
+                str += toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' ');
+                out << maybeInherit(config, config.colors.border)(str) << getLine(file->str(), currLine - 1) << "\n";
             } else {
                 switch (targetSize) {
-                    case 3:  out << " " << color(config, "⋯") << "\n"; break;
-                    case 4:  out << " " << color(config, "··") << "\n"; break;
-                    default: out << " " << color(config, "···") << "\n"; break;
+                    case 3:  out << " " << color(config)("⋯") << "\n"; break;
+                    case 4:  out << " " << color(config)("··") << "\n"; break;
+                    default: out << " " << color(config)("···") << "\n"; break;
                 }   
             }
         }
 
         /* prints the bars on the left with the correct indentation */
         void printLeft(const Config& config, std::ostream& out, unsigned int maxLine, bool printBar = true) {
-            out << std::string(std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right, ' ');
+            out << std::string(std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum, ' ');
             if (printBar)
-                out << color(config, toString(config.chars.borderVertical) + " ");
+                out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
         }
 
         /* prints the `╭─ file.xyz ─╴` at the start of the file's diagnostics */
         void printTop(const Config& config, std::ostream& out, SourceFile* file, unsigned int maxLine) {
             printLeft(config, out, maxLine, false);
-            out << color(config, config.chars.beforeFileName) << file->str() << color(config, config.chars.afterFileName) << "\n";
+            out << maybeInherit(config, config.colors.border)(config.chars.beforeFileName) 
+                << file->str() << maybeInherit(config, config.colors.border)(config.chars.afterFileName) << "\n";
         }
 
         /* prints the border at the end of the file's diagnostics */
         void printBottom(const Config& config, std::ostream& out, unsigned int maxLine) {
-            for (size_t i = 0; i < std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right; i++)
-                out << color(config, toString(config.chars.borderHorizontal));
-            out << color(config, toString(config.chars.borderBottomRight)) << "\n";
+            for (uint8_t i = 0; i < config.padding.borderBottom; i++) {
+                printLeft(config, out, maxLine);
+                out << "\n";
+            }
+            for (size_t i = 0; i < std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum; i++)
+                out << maybeInherit(config, config.colors.border)(toString(config.chars.borderHorizontal));
+            out << maybeInherit(config, config.colors.border)(toString(config.chars.borderBottomRight)) << "\n";
         }
 
         /* prints the bars on the left with the correct indentation + with the line number */
         void printLeftWithLineNum(const Config& config, std::ostream& out, unsigned int lineNum, unsigned int maxLine, bool printBar = true) {
-            unsigned int targetSize = std::to_string(maxLine).size() + config.lineNumPadding.left + config.lineNumPadding.right;
-            auto str = std::string(config.lineNumPadding.left, ' ') + std::to_string(lineNum) + std::string(config.lineNumPadding.right, ' ');
+            unsigned int targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
+            auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(lineNum) + std::string(config.padding.afterLineNum, ' ');
             while (str.size() < targetSize)
                 str += " ";
-            out << color(config, str);
+            out << maybeInherit(config, config.colors.border)(str);
             if (printBar)
-                out << color(config, toString(config.chars.borderVertical) + " ");
+                out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
         }
 
         /* prints all secondary messages on the current line */
@@ -482,7 +505,7 @@ namespace reporter {
                 // only one secondary concerning this line
                 indent(config, out, line, first.loc.start);
                 for (size_t idx = 0; idx < first.loc.end - first.loc.start; idx++)
-                    out << first.color(config, getUnderline(config, 1));
+                    out << first.color(config)(getUnderline(config, 1));
                 auto lines = splitLines(first.subMsg);
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
@@ -490,7 +513,7 @@ namespace reporter {
                         for (size_t j = 0; j < first.loc.end; j++)
                             out << (line[j] == '\t' ? std::string(config.tabWidth, ' ') : " ");
                     }
-                    out << " " << first.color(config, lines[idx]) << "\n";
+                    out << " " << first.color(config)(lines[idx]) << "\n";
                 }
                 i++;
             } else {
@@ -504,7 +527,7 @@ namespace reporter {
                         }
                     if (!firstFound)
                         out << getUnderline(config, count);
-                    else out << firstFound->color(config, getUnderline(config, count));
+                    else out << firstFound->color(config)(getUnderline(config, count));
                 }
                 out << "\n";
                 for (; i < secondaries.size() && onSameLine(secondaries[i], first); i++) {
@@ -513,7 +536,7 @@ namespace reporter {
                         bool b = false;
                         for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
                             if (secondaries[idx].loc.start == j) {
-                                out << secondaries[idx].color(config, toString(config.chars.lineVertical));
+                                out << secondaries[idx].color(config)(toString(config.chars.lineVertical));
                                 b = true;
                             }
                         if (!b) out << " ";
@@ -521,7 +544,7 @@ namespace reporter {
                     auto lines = splitLines(secondaries[i].subMsg);
                     for (size_t idx = 0; idx < lines.size(); idx++) {
                         if (idx == 0)
-                            out << secondaries[i].color(config, config.chars.lineBottomLeft + lines[idx]) << "\n";
+                            out << secondaries[i].color(config)(config.chars.lineBottomLeft + lines[idx]) << "\n";
                         else {
                             printLeft(config, out, maxLine);
                             for (size_t j = 0; j < secondaries[i].loc.start; j++) {
@@ -529,12 +552,12 @@ namespace reporter {
 
                                 for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
                                     if (secondaries[idx].loc.start == j) {
-                                        out << secondaries[idx].color(config, toString(config.chars.lineVertical));
+                                        out << secondaries[idx].color(config)(toString(config.chars.lineVertical));
                                         b = true;
                                     }
                                 if (!b) out << " ";
                             }
-                            out << secondaries[i].color(config, "  " + lines[idx]) << "\n";
+                            out << secondaries[i].color(config)("  " + lines[idx]) << "\n";
                         }
                     }
                 }
@@ -562,12 +585,12 @@ namespace reporter {
             if (config.style == DisplayStyle::SHORT) {
                 if (loc.file) 
                     out << loc.file->str() << ":" << loc.line << ":" << loc.start << ":" << loc.end << ": ";
-                out << color(config, tyToString(config) + ": ") << config.colors.message(replaceAll(msg, "\n", "\\n")) << "\n";
+                out << color(config)(tyToString(config) + ": ") << maybeInherit(config, config.colors.message)(replaceAll(msg, "\n", "\\n")) << "\n";
                 for (auto& i : secondaries)
                 {
                     if (i.loc.file) 
                         out << i.loc.file->str() << ":" << i.loc.line << ":" << i.loc.start << ":" << i.loc.end << ": ";
-                    out << i.color(config, i.tyToString(config) + ": ") << replaceAll(i.subMsg, "\n", "\\n") << "\n";
+                    out << i.color(config)(i.tyToString(config) + ": ") << replaceAll(i.subMsg, "\n", "\\n") << "\n";
                 }
                 return *this;
             }
@@ -577,8 +600,6 @@ namespace reporter {
             for (auto& secondary : secondaries)
                 if (secondary.loc.line > maxLine)
                     maxLine = secondary.loc.line;
-
-            
 
             // by default we're pointing at the error location from below the code snippet
             bool printAbove = false; 
@@ -592,25 +613,32 @@ namespace reporter {
 
             // print the main error message
             if (msg != "")
-                out << color(config, tyToString(config) + ": ") << config.colors.message(msg) << "\n";
+                out << color(config)(tyToString(config) + ": ") << maybeInherit(config, config.colors.message)(msg) << "\n";
 
-            // we're finished if the diagnostic has no location
-            if (loc.file == nullptr) return *this;
+            size_t i = 0; // current index in `secondaries`
+            unsigned int lastLine = 0; // the last line we rendered
+            std::string line = ""; // the snippet we're going to print
+
+            // skip to after the diagnostic's location is printed if it has no location 
+            if (loc.file == nullptr) goto afterSubMsg;
 
             // print the file the error is in
             printTop(config, out, loc.file, maxLine);
 
-            size_t i = 0; // current index in `secondaries`
-            unsigned int lastLine = 0; // the last line we rendered
+            // top padding
+            for (uint8_t idx = 0; idx < config.padding.borderTop - 1; idx++) {
+                printLeft(config, out, maxLine);
+                out << "\n";
+            }
 
             // first print all messages in the main file which come before the error
             while (i < secondaries.size() && secondaries[i].loc.file == loc.file && secondaries[i].loc.line < loc.line) {
                 auto &secondary = secondaries[i];
 
-                if (lastLine == 0) { // if we're rendering the first line in the file, print an empty line
+                if (lastLine == 0 && config.padding.borderTop != 0) { // if we're rendering the first line in the file, print an empty line
                     printLeft(config, out, maxLine); 
                     out << "\n";
-                } else if (lastLine < secondary.loc.line - 1)
+                } else if (lastLine != 0 && lastLine < secondary.loc.line - 1)
                     printPadding(config, out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
                 lastLine = secondary.loc.line;
@@ -620,9 +648,9 @@ namespace reporter {
                 printSecondariesOnLine(config, out, line, i, maxLine);
             }
 
-            std::string line = getLine(loc.file->str(), loc.line);
+            line = getLine(loc.file->str(), loc.line);
 
-            if (lastLine == 0 && !printAbove) {
+            if (lastLine == 0 && !printAbove && config.padding.borderTop != 0) {
                 printLeft(config, out, maxLine);
                 out << "\n";
             } else if (lastLine != 0 && lastLine < loc.line - 1)
@@ -634,7 +662,7 @@ namespace reporter {
                     for (auto currLine : splitLines(subMsg)) {
                         printLeft(config, out, maxLine);
                         indent(config, out, line, loc.start);
-                        out << color(config, currLine);
+                        out << color(config)(currLine);
                         out << "\n";
                     }
                 }
@@ -643,7 +671,7 @@ namespace reporter {
 
                 indent(config, out, line, loc.start);
                 for (unsigned int i = 0; i < loc.end - loc.start; i++)
-                    out << color(config, toString(config.chars.arrowDown));
+                    out << color(config)(toString(config.chars.arrowDown));
                 out << "\n";
             }
             
@@ -656,25 +684,28 @@ namespace reporter {
                     printLeft(config, out, maxLine);
                     indent(config, out, line, loc.start);
                     for (unsigned int j = 0; j < loc.end - loc.start; j++)
-                        out << color(config, i == 0 ? toString(config.chars.arrowUp) : " ");
+                        out << color(config)(i == 0 ? toString(config.chars.arrowUp) : " ");
                     out << " ";
-                    out << color(config, split[i]) << "\n";
+                    out << color(config)(split[i]) << "\n";
                 }
             }
         
             if (i < secondaries.size() && onSameLine(secondaries[i], *this))
                 printSecondariesOnLine(config, out, line, i, maxLine);
-            
+
+        afterSubMsg:    
             auto currFile = loc.file;
             while (i < secondaries.size() && secondaries[i].loc.file) {
                 auto &secondary = secondaries[i];
-
-                if (secondary.loc.file->str() != currFile->str()) {
+                if (currFile == nullptr || secondary.loc.file->str() != currFile->str()) {
+                    if (currFile != nullptr)                    
+                        printBottom(config, out, maxLine);
                     currFile = secondary.loc.file;
-                    printBottom(config, out, maxLine);
                     printTop(config, out, currFile, maxLine);
-                    printLeft(config, out, maxLine);
-                    out << "\n";
+                    for (uint8_t i = 0; i < config.padding.borderTop; i++) {
+                        printLeft(config, out, maxLine);
+                        out << "\n";
+                    }
                 } else if (lastLine < secondary.loc.line - 1)
                     printPadding(config, out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
@@ -689,7 +720,7 @@ namespace reporter {
             for (; i < secondaries.size(); i++) {
                 auto& secondary = secondaries[i];
                 printLeft(config, out, maxLine, false);
-                out << secondary.color(config, toString(config.chars.noteBullet) + " " + secondary.tyToString(config) + secondary.color(config, ": "));
+                out << secondary.color(config)(toString(config.chars.noteBullet) + " " + secondary.tyToString(config) + secondary.color(config)(": "));
                 auto lines = splitLines(secondary.subMsg);
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
