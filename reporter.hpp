@@ -224,6 +224,7 @@ namespace reporter {
             colors::Color warning = colors::fgyellow & colors::bold;
             colors::Color note = colors::fgblack & colors::bold;
             colors::Color help = colors::fgblue & colors::bold;
+            colors::Color message = colors::bold;
         } colors;
         
         struct {
@@ -555,14 +556,29 @@ namespace reporter {
          */
         Diagnostic& print(std::ostream& out, const Config& config = Config::getDefault()) {
 
+            // sort the vector of secondary messages based on the order we want to be printing them 
+            sortSecondaries();
+
+            if (config.style == DisplayStyle::SHORT) {
+                if (loc.file) 
+                    out << loc.file->str() << ":" << loc.line << ":" << loc.start << ":" << loc.end << ": ";
+                out << color(config, tyToString(config) + ": ") << config.colors.message(replaceAll(msg, "\n", "\\n")) << "\n";
+                for (auto& i : secondaries)
+                {
+                    if (i.loc.file) 
+                        out << i.loc.file->str() << ":" << i.loc.line << ":" << i.loc.start << ":" << i.loc.end << ": ";
+                    out << i.color(config, i.tyToString(config) + ": ") << replaceAll(i.subMsg, "\n", "\\n") << "\n";
+                }
+                return *this;
+            }
+
             // find the maximum line (to know by how much to indent the bars)
             auto maxLine = loc.line;
             for (auto& secondary : secondaries)
                 if (secondary.loc.line > maxLine)
                     maxLine = secondary.loc.line;
 
-            // sort the vector of secondary messages based on the order we want to be printing them 
-            sortSecondaries();
+            
 
             // by default we're pointing at the error location from below the code snippet
             bool printAbove = false; 
@@ -576,7 +592,7 @@ namespace reporter {
 
             // print the main error message
             if (msg != "")
-                out << color(config, tyToString(config) + ": ") << colors::bold(msg) << "\n";
+                out << color(config, tyToString(config) + ": ") << config.colors.message(msg) << "\n";
 
             // we're finished if the diagnostic has no location
             if (loc.file == nullptr) return *this;
