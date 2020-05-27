@@ -271,6 +271,8 @@ namespace reporter {
             colors::Color help = colors::fgblue & colors::bold;
             colors::Color message = colors::bold; // the color of the main error message
             colors::Color border = colors::inherit;
+            colors::Color lineNum = colors::inherit;
+            colors::Color highlightLineNum = colors::inherit;
         } colors;
         
 
@@ -507,24 +509,6 @@ namespace reporter {
             );
         }
         
-        /* a 'padding' line is an irrelevant line in between two other relevant lines */
-        void printPadding(const Config& config, std::ostream& out, uint32_t maxLine, uint32_t lastLine, uint32_t currLine, SourceFile *file) {
-            uint32_t targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
-            if (lastLine + 2 == currLine) {
-                auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(currLine - 1) + std::string(config.padding.afterLineNum, ' ');
-                while (str.size() < targetSize)
-                    str += " ";
-                str += toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' ');
-                out << maybeInherit(config, config.colors.border)(str) << getLine(file->str(), currLine - 1) << "\n";
-            } else {
-                switch (targetSize) {
-                    case 3:  out << " " << color(config)("⋯") << "\n"; break;
-                    case 4:  out << " " << color(config)("··") << "\n"; break;
-                    default: out << " " << color(config)("···") << "\n"; break;
-                }   
-            }
-        }
-
         /* prints the bars on the left with the correct indentation */
         void printLeft(const Config& config, std::ostream& out, uint32_t maxLine, bool printBar = true) {
             out << std::string(std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum, ' ');
@@ -556,9 +540,25 @@ namespace reporter {
             auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(lineNum) + std::string(config.padding.afterLineNum, ' ');
             while (str.size() < targetSize)
                 str += " ";
-            out << maybeInherit(config, config.colors.border)(str);
+            if (lineNum == loc.line)
+                out << maybeInherit(config, config.colors.highlightLineNum)(str);
+            else out << maybeInherit(config, config.colors.lineNum)(str);
             if (printBar)
-                out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
+                    out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
+        }
+
+        /* a 'padding' line is an irrelevant line in between two other relevant lines */
+        void printPadding(const Config& config, std::ostream& out, uint32_t maxLine, uint32_t lastLine, uint32_t currLine, SourceFile *file) {
+            if (lastLine + 2 == currLine) {
+                printLeftWithLineNum(config, out, currLine - 1, maxLine);
+                out << getLine(file->str(), currLine - 1) << "\n";
+            } else {
+                switch (std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum) {
+                    case 3:  out << " " << color(config)("⋯") << "\n"; break;
+                    case 4:  out << " " << color(config)("··") << "\n"; break;
+                    default: out << " " << color(config)("···") << "\n"; break;
+                }   
+            }
         }
 
         /* prints all secondary messages on the current line */
