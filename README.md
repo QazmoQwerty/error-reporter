@@ -87,3 +87,25 @@ reporter::Error("an error", "here", { 4, 14, &file })
 ```
 
 ![](screenshots/example2.png)
+
+
+### Custom Config
+
+You can customize most aspects of the display settings such as color, padding, used characters, etc.
+
+```c++
+reporter::Config cfg;
+cfg.padding.borderBottom = 1; // default is 0
+cfg.chars.noteBullet = '*'; // default is '•'
+cfg.style = reporter::DisplayStyle::RICH; // other option is SHORT
+cfg.colors.border = reporter::colors::fgcyan; // default is `reporter::colors::inherit`
+
+err.print(std::cerr, cfg); // specify config when printing
+```
+
+Different colors can be combined with the `&` operator:
+
+```c++
+auto c = reporter::colors::fgred & reporter::colors::bgblue & 
+         reporter::colors::bold & reporter::colors::underline;
+```
