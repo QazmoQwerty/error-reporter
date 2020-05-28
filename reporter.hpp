@@ -274,7 +274,6 @@ namespace reporter {
             colors::Color lineNum = colors::inherit;
             colors::Color highlightLineNum = colors::inherit;
         } colors;
-        
 
         struct {
             /*
@@ -332,11 +331,6 @@ namespace reporter {
 
         Config() : style(DisplayStyle::RICH), tabWidth(4) { }
         Config(DisplayStyle style, uint32_t tabWidth) : style(style), tabWidth(tabWidth) {}
-
-        static const Config& getDefault() {
-            static const Config ret = Config();
-            return ret;
-        }
     };
 
     /**
@@ -641,7 +635,7 @@ namespace reporter {
          * @param out stream in which to print the error.
          * @return the object which this function was called upon.
          */
-        Diagnostic& print(std::ostream& out, const Config& config = Config::getDefault()) {
+        Diagnostic& print(std::ostream& out, const Config&& config = Config()) {
 
             // sort the vector of secondary messages based on the order we want to be printing them 
             sortSecondaries();
@@ -875,7 +869,7 @@ namespace reporter {
          * @param out stream in which to print the error.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& print(std::ostream& out, const Config& config = Config::getDefault()) { Diagnostic::print(out, config); return *this; };
+        DiagnosticTy<T>& print(std::ostream& out, const Config&& config = Config()) { Diagnostic::print(out, std::move(config)); return *this; };
 
         /**
          * Adds a secondary note message to the diagnostic at `location`.
