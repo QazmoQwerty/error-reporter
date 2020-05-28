@@ -274,7 +274,6 @@ namespace reporter {
             colors::Color lineNum = colors::inherit;
             colors::Color highlightLineNum = colors::inherit;
         } colors;
-        
 
         struct {
             /*
