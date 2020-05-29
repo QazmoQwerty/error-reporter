@@ -170,6 +170,17 @@ namespace reporter {
         virtual std::string str() = 0;
 
         virtual ~SourceFile() {}; 
+
+        /* get a specific line from the file */
+        virtual std::string getLine(uint32_t line) {
+            std::fstream file(str());
+            file.seekg(std::ios::beg);
+            for (int i=0; i < line - 1; ++i)
+                file.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+            std::string ret;
+            std::getline(file, ret);
+            return ret;
+        }
     };
 
     /**
@@ -414,17 +425,6 @@ namespace reporter {
             return strings;
         }
 
-        /* get a specific line from a text file */
-        static std::string getLine(std::string fileName, int line) {
-            std::fstream file(fileName);
-            file.seekg(std::ios::beg);
-            for (int i=0; i < line - 1; ++i)
-                file.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
-            std::string ret;
-            std::getline(file, ret);
-            return ret;
-        }
-
         /* prints `count` lines of whitespace */
         static void indent(const Config& config, std::ostream& out, std::string& line, uint32_t count) {
             for (uint32_t i = 0; i < count; i++)
@@ -544,7 +544,7 @@ namespace reporter {
         void printPadding(const Config& config, std::ostream& out, uint32_t maxLine, uint32_t lastLine, uint32_t currLine, SourceFile *file) {
             if (lastLine + 2 == currLine) {
                 printLeftWithLineNum(config, out, currLine - 1, maxLine);
-                out << getLine(file->str(), currLine - 1) << "\n";
+                out << file->getLine(currLine - 1) << "\n";
             } else {
                 switch (std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum) {
                     case 3:  out << " " << color(config)("⋯") << "\n"; break;
@@ -699,13 +699,13 @@ namespace reporter {
                     printPadding(config, out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
                 lastLine = secondary.loc.line;
-                std::string line = getLine(loc.file->str(), secondary.loc.line);
+                std::string line = loc.file->getLine(secondary.loc.line);
                 printLeftWithLineNum(config, out, secondary.loc.line, maxLine);
                 printLine(config, out, line);
                 printSecondariesOnLine(config, out, line, i, maxLine);
             }
 
-            line = getLine(loc.file->str(), loc.line);
+            line = loc.file->getLine(loc.line);
 
             if (lastLine == 0 && !printAbove && config.padding.borderTop != 0) {
                 printLeft(config, out, maxLine);
@@ -771,7 +771,7 @@ namespace reporter {
                     printPadding(config, out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
                 lastLine = secondary.loc.line;
-                std::string line = getLine(currFile->str(), secondary.loc.line);
+                std::string line = currFile->getLine(secondary.loc.line);
                 printLeftWithLineNum(config, out, secondary.loc.line, maxLine);
                 printLine(config, out, line);
                 printSecondariesOnLine(config, out, line, i, maxLine);
