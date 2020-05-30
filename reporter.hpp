@@ -52,21 +52,21 @@ namespace reporter {
 
             // inherit is used to tell the reporter to use the diagnostic's type's color.
             const uint8_t inherit   = 1 << 7;
-        };
+        }
 
         /**
          * Utility class which represents a terminal color.
          * @note "color" can mean both "red/green" and "bold/italic".
          */ 
         class Color {
-            uint8_t fg; // foreground color (ansi codes 30-37)
-            uint8_t bg; // background color (ansi codes 40-47)
-            uint8_t attributes;
+            uint8_t _fg; // foreground color (ansi codes 30-37)
+            uint8_t _bg; // background color (ansi codes 40-47)
+            uint8_t _attributes;
         public:
-            Color() : fg(0), bg(0), attributes(0) {}
-            Color(uint8_t fg, uint8_t bg) : fg(fg), bg(bg), attributes(0) {}
-            Color(uint8_t fg, uint8_t bg, uint8_t attributes) : fg(fg), bg(bg), attributes(attributes) {}
-            Color(const Color color, uint8_t attributes) : fg(color.fg), bg(color.bg), attributes(color.attributes | attributes) {}
+            Color() : _fg(0), _bg(0), _attributes(0) {}
+            Color(uint8_t fg, uint8_t bg) : _fg(fg), _bg(bg), _attributes(0) {}
+            Color(uint8_t fg, uint8_t bg, uint8_t attributes) : _fg(fg), _bg(bg), _attributes(attributes) {}
+            Color(const Color color, uint8_t attributes) : _fg(color._fg), _bg(color._bg), _attributes(color._attributes | attributes) {}
 
             /** 
              * @return this color, in addition with the specified attributes.
@@ -87,9 +87,9 @@ namespace reporter {
              */
             Color with(const Color color) const {
                 return Color(
-                    color.fg ? color.fg : fg,
-                    color.bg ? color.bg : bg,
-                    color.attributes | attributes
+                    color._fg ? color._fg : _fg,
+                    color._bg ? color._bg : _bg,
+                    color._attributes | _attributes
                 );
             }
 
@@ -105,9 +105,9 @@ namespace reporter {
              * @return true if background color, foreground color, and attributes are the same.
              */
             bool operator==(const Color color) const {
-                return bg == color.bg &&
-                       fg == color.fg &&
-                       attributes == color.attributes;
+                return _bg == color._bg &&
+                       _fg == color._fg &&
+                       _attributes == color._attributes;
             }
 
             /** 
@@ -116,14 +116,14 @@ namespace reporter {
              * @return the colored string.
              */
             std::string operator()(std::string str) const {
-                if (attributes & attributes::bold)      str = "\x1B[1m" + str + "\x1B[0m";
-                if (attributes & attributes::weak)      str = "\x1B[2m" + str + "\x1B[0m";
-                if (attributes & attributes::italic)    str = "\x1B[3m" + str + "\x1B[0m";
-                if (attributes & attributes::underline) str = "\x1B[4m" + str + "\x1B[0m";
-                if (attributes & attributes::blink)     str = "\x1B[5m" + str + "\x1B[0m";
-                if (attributes & attributes::reverse)   str = "\x1B[9m" + str + "\x1B[0m";
-                if (fg) str = "\x1B[" + std::to_string(fg) + "m" + str + "\x1B[0m";
-                if (bg) str = "\x1B[" + std::to_string(bg) + "m" + str + "\x1B[0m";
+                if (_attributes & attributes::bold)      str = "\x1B[1m" + str + "\x1B[0m";
+                if (_attributes & attributes::weak)      str = "\x1B[2m" + str + "\x1B[0m";
+                if (_attributes & attributes::italic)    str = "\x1B[3m" + str + "\x1B[0m";
+                if (_attributes & attributes::underline) str = "\x1B[4m" + str + "\x1B[0m";
+                if (_attributes & attributes::blink)     str = "\x1B[5m" + str + "\x1B[0m";
+                if (_attributes & attributes::reverse)   str = "\x1B[9m" + str + "\x1B[0m";
+                if (_fg) str = "\x1B[" + std::to_string(_fg) + "m" + str + "\x1B[0m";
+                if (_bg) str = "\x1B[" + std::to_string(_bg) + "m" + str + "\x1B[0m";
                 return str;
             }
         };
@@ -169,13 +169,13 @@ namespace reporter {
          */
         virtual std::string str() = 0;
 
-        virtual ~SourceFile() {}; 
+        virtual ~SourceFile() {}
 
         /* get a specific line from the file */
         virtual std::string getLine(uint32_t line) {
             std::fstream file(str());
             file.seekg(std::ios::beg);
-            for (int i=0; i < line - 1; ++i)
+            for (uint32_t i=0; i < line - 1; ++i)
                 file.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
             std::string ret;
             std::getline(file, ret);
@@ -212,12 +212,12 @@ namespace reporter {
         WARNING,
         NOTE,
         HELP,
-        UNKNOWN,
+        UNKNOWN
     };
 
     /**
      * A location of source code.
-     * @example `{ 2, 3, 5 }` -> on 2nd line, from the 4th character to (and excluding) the 6th character"
+     * Example: `{ 2, 3, 5 }` -> on 2nd line, from the 4th character to (and excluding) the 6th character"
      */
     class Location {
     public:
@@ -228,24 +228,24 @@ namespace reporter {
 
         /** 
          * Constructs a Location in `file` at `line`, from `start` to (and excluding) `end`.
-         * @param line line in the file (line count starts at 1).  
-         * @param start index of the first character of the line to be included (starts at 0).
-         * @param end index of the first character of the line to be excluded (starts at 0).
-         * @param file file this location is in.
+         * @param _line line in the file (line count starts at 1).  
+         * @param _start index of the first character of the line to be included (starts at 0).
+         * @param _end index of the first character of the line to be excluded (starts at 0).
+         * @param _file file this location is in.
          */
-        Location(uint32_t line, uint32_t start, uint32_t end, SourceFile* file)
-                : line(line), start(start), end(end), file(file) {
+        Location(uint32_t _line, uint32_t _start, uint32_t _end, SourceFile* _file)
+                : line(_line), start(_start), end(_end), file(_file) {
             if (this->end <= this->start)
                 this->end = this->start + 1;
         }
 
         /**
          * Constructs a Location in `file` at `line`, at the character with index of `loc`.
-         * @param line line in the file (line count starts at 1).  
+         * @param lineNum line in the file (line count starts at 1).  
          * @param loc index of the only character of the line to be included (starts at 0).
-         * @param file file this location is in.
+         * @param src file this location is in.
          */
-        Location(uint32_t line, uint32_t loc, SourceFile* file) : Location(line, loc, loc + 1, file) {}
+        Location(uint32_t lineNum, uint32_t loc, SourceFile* src) : Location(lineNum, loc, loc + 1, src) {}
 
         /**
          * Constructs a non-location
@@ -377,15 +377,23 @@ namespace reporter {
         std::vector<Diagnostic> secondaries;
 
         /* unicode code point to string */
-        static std::string toString(wchar_t cp)
+        static std::string toString(char32_t cp)
         {
-            char c[5]={ 0x00,0x00,0x00,0x00,0x00 };
-            if     (cp<=0x7F) { c[0] = cp;  }
-            else if(cp<=0x7FF) { c[0] = (cp>>6)+192; c[1] = (cp&63)+128; }
-            else if(0xd800<=cp && cp<=0xdfff) {} //invalid block of utf8
-            else if(cp<=0xFFFF) { c[0] = (cp>>12)+224; c[1]= ((cp>>6)&63)+128; c[2]=(cp&63)+128; }
-            else if(cp<=0x10FFFF) { c[0] = (cp>>18)+240; c[1] = ((cp>>12)&63)+128; c[2] = ((cp>>6)&63)+128; c[3]=(cp&63)+128; }
-            return std::string(c);
+            uint8_t c[5] = { 0 };
+            if      (cp<=0x7F) { c[0] = static_cast<uint8_t>(cp); } 
+            else if (cp<=0x7FF) { c[0] = static_cast<uint8_t>((cp>>6)+192); c[1] = static_cast<uint8_t>((cp&63)+128); }
+            else if (0xd800<=cp && cp<=0xdfff) { /*invalid block of utf8*/ } 
+            else if (cp <= 0xFFFF)   { 
+                c[0] = static_cast<uint8_t>((cp>>12)+224);
+                c[1] = static_cast<uint8_t>(((cp>>6)&63)+128);
+                c[2] = static_cast<uint8_t>((cp&63)+128); 
+            } 
+            else if (cp <= 0x10FFFF) { 
+                c[0] = static_cast<uint8_t>((cp>>18)+240);
+                c[1] = static_cast<uint8_t>(((cp>>12)&63)+128); 
+                c[2] = static_cast<uint8_t>(((cp>>6)&63)+128);
+                c[3] = static_cast<uint8_t>((cp&63)+128); }
+            return std::string(reinterpret_cast<char*>(c));
         }
 
         /* repeat `s` `n` times */
@@ -451,11 +459,12 @@ namespace reporter {
         std::string tyToString(const Config& config) {
             std::string str;
             switch (errTy) {
+                case DiagnosticType::INTERNAL_ERROR: 
+                case DiagnosticType::UNKNOWN: str = config.chars.internalErrorName; break;
                 case DiagnosticType::ERROR:   str = config.chars.errorName;         break;
                 case DiagnosticType::WARNING: str = config.chars.warningName;       break;
                 case DiagnosticType::NOTE:    str = config.chars.noteName;          break;
                 case DiagnosticType::HELP:    str = config.chars.helpName;          break;
-                default:      str = config.chars.internalErrorName; break;
             }
             if (code != "")
                 return str + toString(config.chars.errCodeBracketLeft) + code  + toString(config.chars.errCodeBracketRight);
@@ -465,7 +474,9 @@ namespace reporter {
         /* returns errTy's color */
         const colors::Color& color(const Config& config) {
             switch (errTy) {
-                default:      return config.colors.error;
+                case DiagnosticType::INTERNAL_ERROR: 
+                case DiagnosticType::UNKNOWN: 
+                case DiagnosticType::ERROR:   return config.colors.error;
                 case DiagnosticType::WARNING: return config.colors.warning;
                 case DiagnosticType::NOTE:    return config.colors.note;
                 case DiagnosticType::HELP:    return config.colors.help;
@@ -529,7 +540,7 @@ namespace reporter {
 
         /* prints the bars on the left with the correct indentation + with the line number */
         void printLeftWithLineNum(const Config& config, std::ostream& out, uint32_t lineNum, uint32_t maxLine, bool printBar = true) {
-            uint32_t targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
+            auto targetSize = std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum;
             auto str = std::string(config.padding.beforeLineNum, ' ') + std::to_string(lineNum) + std::string(config.padding.afterLineNum, ' ');
             while (str.size() < targetSize)
                 str += " ";
@@ -607,9 +618,9 @@ namespace reporter {
                             for (size_t j = 0; j < secondaries[i].loc.start; j++) {
                                 bool b = false;
 
-                                for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
-                                    if (secondaries[idx].loc.start == j) {
-                                        out << secondaries[idx].color(config)(toString(config.chars.lineVertical));
+                                for (auto k = i; !b && k < secondaries.size() && onSameLine(secondaries[k], first); k++)
+                                    if (secondaries[k].loc.start == j) {
+                                        out << secondaries[k].color(config)(toString(config.chars.lineVertical));
                                         b = true;
                                     }
                                 if (!b) out << " ";
@@ -622,11 +633,11 @@ namespace reporter {
         }
 
     protected:
-        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, std::string code, Location location) 
-               : msg(message), subMsg(subMessage), loc(location), errTy(ty), code(code) {};
-        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, Location location) : Diagnostic(ty, message, subMessage, "", location) {};
-        Diagnostic(DiagnosticType ty, std::string message, Location location) : Diagnostic(ty, message, "", location) {};
-        Diagnostic(DiagnosticType ty, std::string message) : Diagnostic(ty, message, {}) {};
+        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, std::string diagCode, Location location) 
+               : msg(message), subMsg(subMessage), loc(location), errTy(ty), code(diagCode) {}
+        Diagnostic(DiagnosticType ty, std::string message, std::string subMessage, Location location) : Diagnostic(ty, message, subMessage, "", location) {}
+        Diagnostic(DiagnosticType ty, std::string message, Location location) : Diagnostic(ty, message, "", location) {}
+        Diagnostic(DiagnosticType ty, std::string message) : Diagnostic(ty, message, {}) {}
 
     public:
         /**
@@ -699,7 +710,7 @@ namespace reporter {
                     printPadding(config, out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
                 lastLine = secondary.loc.line;
-                std::string line = loc.file->getLine(secondary.loc.line);
+                line = loc.file->getLine(secondary.loc.line);
                 printLeftWithLineNum(config, out, secondary.loc.line, maxLine);
                 printLine(config, out, line);
                 printSecondariesOnLine(config, out, line, i, maxLine);
@@ -740,13 +751,13 @@ namespace reporter {
                     out << "\n";
                 else {
                     auto split = splitLines(subMsg);
-                    for (size_t i = 0; i < split.size(); i++) {
-                        if (i != 0) {
+                    for (size_t k = 0; k < split.size(); k++) {
+                        if (k) {
                             printLeft(config, out, maxLine);
                             indent(config, out, line, loc.start);
                             out << std::string(loc.end - loc.start, ' ');
                         }
-                        out << " " << color(config)(split[i]) << "\n";
+                        out << " " << color(config)(split[k]) << "\n";
                     }
                 }
             }
@@ -763,7 +774,7 @@ namespace reporter {
                         printBottom(config, out, maxLine);
                     currFile = secondary.loc.file;
                     printTop(config, out, currFile, maxLine);
-                    for (uint8_t i = 0; i < config.padding.borderTop; i++) {
+                    for (uint8_t k = 0; k < config.padding.borderTop; k++) {
                         printLeft(config, out, maxLine);
                         out << "\n";
                     }
@@ -771,7 +782,7 @@ namespace reporter {
                     printPadding(config, out, maxLine, lastLine, secondary.loc.line, secondary.loc.file);
 
                 lastLine = secondary.loc.line;
-                std::string line = currFile->getLine(secondary.loc.line);
+                line = currFile->getLine(secondary.loc.line);
                 printLeftWithLineNum(config, out, secondary.loc.line, maxLine);
                 printLine(config, out, line);
                 printSecondariesOnLine(config, out, line, i, maxLine);
@@ -870,8 +881,8 @@ namespace reporter {
          * @param out stream in which to print the error.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& print(std::ostream& out, const Config& config)             { Diagnostic::print(out, config); return *this; };
-        DiagnosticTy<T>& print(std::ostream& out, const Config&& config = Config()) { Diagnostic::print(out, config); return *this; };
+        DiagnosticTy<T>& print(std::ostream& out, const Config& config)             { Diagnostic::print(out, config); return *this; }
+        DiagnosticTy<T>& print(std::ostream& out, const Config&& config = Config()) { Diagnostic::print(out, config); return *this; }
 
         /**
          * Adds a secondary note message to the diagnostic at `location`.
@@ -879,7 +890,7 @@ namespace reporter {
          * @param location source code location of the note message.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& withNote(std::string message, Location location) { Diagnostic::withNote(message, location); return *this; };
+        DiagnosticTy<T>& withNote(std::string message, Location location) { Diagnostic::withNote(message, location); return *this; }
 
         /**
          * Adds a secondary help message to the diagnostic at `location`.
@@ -887,21 +898,21 @@ namespace reporter {
          * @param location source code location of the help message.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& withHelp(std::string message, Location location) { Diagnostic::withHelp(message, location); return *this; };
+        DiagnosticTy<T>& withHelp(std::string message, Location location) { Diagnostic::withHelp(message, location); return *this; }
 
         /**
          * Adds a secondary note message to the diagnostic without a specific location.
          * @param message the note message.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& withNote(std::string message) { Diagnostic::withNote(message); return *this; };
+        DiagnosticTy<T>& withNote(std::string message) { Diagnostic::withNote(message); return *this; }
 
         /**
          * Adds a secondary help message to the diagnostic without a specific location.
          * @param message the help message.
          * @return the object which this function was called upon.
          */
-        DiagnosticTy<T>& withHelp(std::string message) { Diagnostic::withHelp(message); return *this; };
+        DiagnosticTy<T>& withHelp(std::string message) { Diagnostic::withHelp(message); return *this; }
     };
 
     /////////////////////////////////////////////////////////////////////////
