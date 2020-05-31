@@ -316,6 +316,8 @@ namespace reporter {
             std::string helpName = "Help";
             std::string internalErrorName = "Internal Error";
 
+            std::string shortModeLineSeperator = " / "; // seperates multi-line diagnostic messages
+
             wchar_t errCodeBracketLeft  = L'(';
             wchar_t errCodeBracketRight = L')';
 
@@ -672,12 +674,14 @@ namespace reporter {
             if (config.style == DisplayStyle::SHORT) {
                 if (loc.file)
                     out << loc.file->str() << ":" << loc.line << ":" << loc.start << ":" << loc.end << ": ";
-                out << color(config)(tyToString(config) + ": ") << maybeInherit(config, config.colors.message)(replaceAll(msg, "\n", "\\n")) << "\n";
+                out << color(config)(tyToString(config) + ": ") 
+                    << maybeInherit(config, config.colors.message)(replaceAll(msg, "\n", config.chars.shortModeLineSeperator)) << "\n";
                 for (auto& i : secondaries)
                 {
                     if (i.loc.file) 
                         out << i.loc.file->str() << ":" << i.loc.line << ":" << i.loc.start << ":" << i.loc.end << ": ";
-                    out << i.color(config)(i.tyToString(config) + ": ") << replaceAll(i.subMsg, "\n", "\\n") << "\n";
+                    out << i.color(config)(i.tyToString(config) + ": ") 
+                        << replaceAll(i.subMsg, "\n", config.chars.shortModeLineSeperator) << "\n";
                 }
                 return *this;
             }
@@ -769,7 +773,10 @@ namespace reporter {
             if (!printAbove) {
                 printLeft(config, out, maxLine);
                 indent(config, out, line, loc.start);
-                out << color(config)(repeat(toString(config.chars.arrowUp), loc.end - loc.start));
+                for (auto j = loc.start; j < loc.end; j++)
+                    if (line[j] == '\t')
+                        out << color(config)(repeat(toString(config.chars.arrowUp), tabWidth(config, j)));
+                    else out << color(config)(toString(config.chars.arrowUp));
                 if (subMsg == "")
                     out << "\n";
                 else {
