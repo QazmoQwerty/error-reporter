@@ -433,10 +433,10 @@ namespace reporter {
             return strings;
         }
 
-        /* prints `count` lines of whitespace */
-        static void indent(const Config& config, std::ostream& out, std::string& line, uint32_t count) {
+        /* prints `count` characters of whitespace */
+        static void indent(const Config& config, std::ostream& out, std::string& line, uint32_t count, size_t start = 0) {
             for (uint32_t i = 0; i < count; i++)
-                out << (line[i] == '\t' ? std::string(config.tabWidth, ' ') : " ");
+                out << (line[start + i] == '\t' ? std::string(config.tabWidth, ' ') : " ");
         }
 
         static void printLine(const Config& config, std::ostream& out, std::string& line) {
@@ -444,15 +444,19 @@ namespace reporter {
         }
 
         /* get corresponding underline character based intensity level */
-        static std::string getUnderline(const Config& config, uint8_t level) {
+        static std::string getUnderline(const Config& config, uint8_t level, std::string& line, size_t idx) {
+            std::string ret = "";
             switch (level) {
-                case 0: return " ";
-                case 1: return toString(config.chars.underline1);
-                case 2: return toString(config.chars.underline2);
-                case 3: return toString(config.chars.underline3);
-                case 4: return toString(config.chars.underline4);
-                default: return toString(level%2 ? config.chars.underlineA : config.chars.underlineB);
+                case 0:  ret = " "; break;
+                case 1:  ret = toString(config.chars.underline1); break;
+                case 2:  ret = toString(config.chars.underline2); break;
+                case 3:  ret = toString(config.chars.underline3); break;
+                case 4:  ret = toString(config.chars.underline4); break;
+                default: ret = toString(level%2 ? config.chars.underlineA : config.chars.underlineB); break;
             }
+            if (line[idx] == '\t')
+                return repeat(ret, config.tabWidth);
+            return ret;
         }
 
         /* return errTy' string representation + the error code if one exists */
@@ -572,14 +576,14 @@ namespace reporter {
             if (i + 1 >= secondaries.size() || !onSameLine(first, secondaries[i + 1])) {
                 // only one secondary concerning this line
                 indent(config, out, line, first.loc.start);
-                for (size_t idx = 0; idx < first.loc.end - first.loc.start; idx++)
-                    out << first.color(config)(getUnderline(config, 1));
+                for (auto idx = first.loc.start; idx < first.loc.end; idx++)
+                    out << first.color(config)(getUnderline(config, 1, line, idx));
+
                 auto lines = splitLines(first.subMsg);
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
                         printLeft(config, out, maxLine);
-                        for (size_t j = 0; j < first.loc.end; j++)
-                            out << (line[j] == '\t' ? std::string(config.tabWidth, ' ') : " ");
+                        indent(config, out, line, first.loc.end);
                     }
                     out << " " << first.color(config)(lines[idx]) << "\n";
                 }
@@ -593,9 +597,9 @@ namespace reporter {
                             count++;
                             if (!firstFound) firstFound = &secondaries[idx];
                         }
-                    if (!firstFound)
-                        out << getUnderline(config, count);
-                    else out << firstFound->color(config)(getUnderline(config, count));
+                    if (firstFound)
+                        out << firstFound->color(config)(getUnderline(config, count, line, lineIdx));
+                    else out << getUnderline(config, count, line, lineIdx);
                 }
                 out << "\n";
                 for (; i < secondaries.size() && onSameLine(secondaries[i], first); i++) {
@@ -605,9 +609,11 @@ namespace reporter {
                         for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
                             if (secondaries[idx].loc.start == j) {
                                 out << secondaries[idx].color(config)(toString(config.chars.lineVertical));
+                                if (line[j] == '\t' && config.tabWidth != 0)
+                                    out << std::string(config.tabWidth - 1, ' ');
                                 b = true;
                             }
-                        if (!b) out << " ";
+                        if (!b) indent(config, out, line, 1, j);
                     }
                     auto lines = splitLines(secondaries[i].subMsg);
                     for (size_t idx = 0; idx < lines.size(); idx++) {
@@ -621,9 +627,12 @@ namespace reporter {
                                 for (auto k = i; !b && k < secondaries.size() && onSameLine(secondaries[k], first); k++)
                                     if (secondaries[k].loc.start == j) {
                                         out << secondaries[k].color(config)(toString(config.chars.lineVertical));
+                                        if (line[j] == '\t' && config.tabWidth != 0)
+                                            out << std::string(config.tabWidth - 1, ' ');
                                         b = true;
                                     }
-                                if (!b) out << " ";
+                                
+                                if (!b) indent(config, out, line, 1, j);
                             }
                             out << secondaries[i].color(config)("  " + lines[idx]) << "\n";
                         }
@@ -737,7 +746,11 @@ namespace reporter {
                 printLeft(config, out, maxLine);
 
                 indent(config, out, line, loc.start);
-                out << color(config)(repeat(toString(config.chars.arrowDown), loc.end - loc.start)) << "\n";
+                for (auto j = loc.start; j < loc.end; j++)
+                    if (line[j] == '\t')
+                        out << color(config)(repeat(toString(config.chars.arrowDown), config.tabWidth));
+                    else out << color(config)(toString(config.chars.arrowDown));
+                out << "\n";
             }
             
             printLeftWithLineNum(config, out, loc.line, maxLine);
