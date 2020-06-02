@@ -505,6 +505,7 @@ namespace reporter {
                 case DiagnosticType::NOTE:    return config.colors.note;
                 case DiagnosticType::HELP:    return config.colors.help;
             }
+            return colors::none;
         }
 
         /* returns errTy's color if `c` is `colors::inherit` (otherwise returns c)*/
@@ -808,7 +809,7 @@ namespace reporter {
                         out << " " << color(config)(split[k]) << "\n";
                     }
                 }
-                for (int j = i; j < secondaries.size() && secondaries[j].loc.file == loc.file && secondaries[j].loc.line == loc.line; j++) {
+                for (size_t j = i; j < secondaries.size() && secondaries[j].loc.file == loc.file && secondaries[j].loc.line == loc.line; j++) {
                     if (secondaries[j].loc == loc) {
                         for (auto str : splitLines(secondaries[j].msg)) {
                             printLeft(config, out, maxLine);
