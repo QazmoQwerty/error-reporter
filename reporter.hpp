@@ -252,6 +252,14 @@ namespace reporter {
          * Used for errors which are not bound to a specific location in the source code.
          */
         Location() : Location(0, 0, 0, nullptr) {}
+
+        bool operator==(Location& other) { 
+            return other.file == file && other.start == start &&
+                   other.line == line && other.end  == end; 
+        }
+        bool operator!=(Location& other) { 
+            return !operator==(other);
+        }
     };
 
     /**
@@ -582,16 +590,22 @@ namespace reporter {
         }
 
         /* prints all secondary messages on the current line */
-        void printSecondariesOnLine(const Config& config, std::ostream& out, std::string &line, size_t &i, uint32_t maxLine) {
+        void printSecondariesOnLine(const Config& config, std::ostream& out, std::string &line, size_t &i, uint32_t maxLine, bool shownAbove) {
             auto &first = secondaries[i];
+            if (!shownAbove && first.loc == loc) { i++; return; }
             printLeft(config, out, maxLine);
+            
             if (i + 1 >= secondaries.size() || !onSameLine(first, secondaries[i + 1])) {
                 // only one secondary concerning this line
                 indent(config, out, line, first.loc.start);
                 for (auto idx = first.loc.start; idx < first.loc.end; idx++)
                     out << first.color(config)(getUnderline(config, 1, line, idx));
 
-                auto lines = splitLines(first.subMsg);
+                auto lines = splitLines(first.msg);
+                for (auto& sec : first.secondaries)
+                    for (auto str : splitLines(sec.msg))
+                        lines.push_back(sec.color(config)(str));
+                
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
                         printLeft(config, out, maxLine);
@@ -627,7 +641,11 @@ namespace reporter {
                             }
                         if (!b) indent(config, out, line, 1, j);
                     }
-                    auto lines = splitLines(secondaries[i].subMsg);
+                    auto lines = splitLines(secondaries[i].msg);
+                    for (auto& sec : secondaries[i].secondaries)
+                        for (auto str : splitLines(sec.msg))
+                            lines.push_back(sec.color(config)(str));
+
                     for (size_t idx = 0; idx < lines.size(); idx++) {
                         if (idx == 0)
                             out << secondaries[i].color(config)(config.chars.lineBottomLeft + lines[idx]) << "\n";
@@ -681,7 +699,7 @@ namespace reporter {
                     if (i.loc.file) 
                         out << i.loc.file->str() << ":" << i.loc.line << ":" << i.loc.start << ":" << i.loc.end << ": ";
                     out << i.color(config)(i.tyToString(config) + ": ") 
-                        << replaceAll(i.subMsg, "\n", config.chars.shortModeLineSeperator) << "\n";
+                        << replaceAll(i.msg, "\n", config.chars.shortModeLineSeperator) << "\n";
                 }
                 return *this;
             }
@@ -697,7 +715,7 @@ namespace reporter {
 
             // if there are any messages on the line of the error, point to the error from above instead
             for (auto& i : secondaries)
-                if (onSameLine(i, *this)) {
+                if (onSameLine(i, *this) && i.loc != loc) {
                     printAbove = true;
                     break;
                 }
@@ -736,7 +754,7 @@ namespace reporter {
                 line = loc.file->getLine(secondary.loc.line);
                 printLeftWithLineNum(config, out, secondary.loc.line, maxLine);
                 printLine(config, out, line);
-                printSecondariesOnLine(config, out, line, i, maxLine);
+                printSecondariesOnLine(config, out, line, i, maxLine, printAbove);
             }
 
             line = loc.file->getLine(loc.line);
@@ -784,16 +802,25 @@ namespace reporter {
                     for (size_t k = 0; k < split.size(); k++) {
                         if (k) {
                             printLeft(config, out, maxLine);
-                            indent(config, out, line, loc.start);
-                            out << std::string(loc.end - loc.start, ' ');
+                            indent(config, out, line, loc.end);
+                            // out << std::string(loc.end - loc.start, ' ');
                         }
                         out << " " << color(config)(split[k]) << "\n";
+                    }
+                }
+                for (int j = i; j < secondaries.size() && secondaries[j].loc.file == loc.file && secondaries[j].loc.line == loc.line; j++) {
+                    if (secondaries[j].loc == loc) {
+                        for (auto str : splitLines(secondaries[j].msg)) {
+                            printLeft(config, out, maxLine);
+                            indent(config, out, line, loc.end);
+                            out << " " << secondaries[j].color(config)(str) << "\n";    
+                        }
                     }
                 }
             }
         
             if (i < secondaries.size() && onSameLine(secondaries[i], *this))
-                printSecondariesOnLine(config, out, line, i, maxLine);
+                printSecondariesOnLine(config, out, line, i, maxLine, printAbove);
 
         afterSubMsg:    
             auto currFile = loc.file;
@@ -815,7 +842,7 @@ namespace reporter {
                 line = currFile->getLine(secondary.loc.line);
                 printLeftWithLineNum(config, out, secondary.loc.line, maxLine);
                 printLine(config, out, line);
-                printSecondariesOnLine(config, out, line, i, maxLine);
+                printSecondariesOnLine(config, out, line, i, maxLine, printAbove);
             }
             if (currFile != nullptr)
                 printBottom(config, out, maxLine); 
@@ -823,7 +850,12 @@ namespace reporter {
                 auto& secondary = secondaries[i];
                 printLeft(config, out, maxLine, false);
                 out << secondary.color(config)(toString(config.chars.noteBullet) + " " + secondary.tyToString(config) + secondary.color(config)(": "));
-                auto lines = splitLines(secondary.subMsg);
+
+                auto lines = splitLines(secondary.msg);
+                for (auto& sec : secondary.secondaries)
+                    for (auto str : splitLines(sec.msg))
+                        lines.push_back(sec.color(config)(str));
+                
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
                         printLeft(config, out, maxLine, false);
@@ -858,14 +890,26 @@ namespace reporter {
          * @param message the note message.
          * @return the object which this function was called upon.
          */
-        inline Diagnostic& withNote(std::string message);
+        inline Diagnostic& withNote(std::string message) { return withNote(message, {}); }
 
         /**
          * Adds a secondary help message to the diagnostic without a specific location.
          * @param message the help message.
          * @return the object which this function was called upon.
          */
-        inline Diagnostic& withHelp(std::string message);        
+        Diagnostic& withHelp(std::string message) { return withHelp(message, {}); }
+
+    private:
+        Diagnostic& with(Diagnostic diag) {
+            if (diag.loc.file != nullptr) 
+                for (auto& i : secondaries)
+                    if (i.loc == diag.loc) {
+                        i.with(diag);
+                        return *this;
+                    }
+            secondaries.push_back(diag);
+            return *this; 
+        }
     };
 
     /////////////////////////////////////////////////////////////////////////
@@ -977,10 +1021,8 @@ namespace reporter {
      */
     typedef DiagnosticTy<DiagnosticType::HELP> Help;
 
-    Diagnostic& Diagnostic::withNote(std::string message, Location location) { secondaries.push_back(Note("", message, location)); return *this; }
-    Diagnostic& Diagnostic::withHelp(std::string message, Location location) { secondaries.push_back(Help("", message, location)); return *this; }
-    Diagnostic& Diagnostic::withNote(std::string message) { return withNote(message, {}); }
-    Diagnostic& Diagnostic::withHelp(std::string message) { return withHelp(message, {}); }
+    Diagnostic& Diagnostic::withNote(std::string message, Location location) { return with(Note(message, location)); }
+    Diagnostic& Diagnostic::withHelp(std::string message, Location location) { return with(Help(message, location)); }
 }
 
 #endif /* DIAGNOSTIC_REPORTER_HPP_INCLUDED */
