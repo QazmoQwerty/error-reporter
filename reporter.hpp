@@ -626,15 +626,35 @@ namespace reporter {
                 for (; idx > i; idx--) {
                     if (toRender.size() == 0)
                         toRender.push_back({ &secondaries[idx-1] });
-                    else if (secondaries[idx-1].loc.start <  toRender[depth].back()->loc.end && 
-                             secondaries[idx-1].loc.end   >= toRender[depth].back()->loc.end) {
-                        if (++depth == toRender.size())
-                            toRender.push_back({});
-                        toRender[depth].push_back(&secondaries[idx-1]);
-                    } else {
-                        while (depth != 0 && secondaries[idx-1].loc.start >= toRender[depth-1].back()->loc.end)
-                            depth--;
-                        toRender[depth].push_back(&secondaries[idx-1]);
+                    else {
+                        bool foundClash = false;
+                        bool foundOverlap = false;
+                        for (auto diag : toRender[depth]) {
+                            if (secondaries[idx-1].loc.start <  diag->loc.end
+                             && secondaries[idx-1].loc.end   >= diag->loc.end) {
+                                foundClash = true;
+                                break;
+                            } else if (secondaries[idx-1].loc.start > diag->loc.start
+                                    && secondaries[idx-1].loc.end   < diag->loc.end)
+                                foundOverlap = true;
+                        }
+                        if (foundClash) {
+                            if (++depth == toRender.size())
+                                toRender.push_back({});
+                            toRender[depth].push_back(&secondaries[idx-1]);
+                        } else {
+                            if (!foundOverlap) {
+                                while (depth != 0) {
+                                    for (auto diag : toRender[depth-1])
+                                        if (secondaries[idx-1].loc.start <  diag->loc.end 
+                                         && secondaries[idx-1].loc.end   >= diag->loc.end
+                                        )
+                                            goto exit;
+                                    depth--;
+                                } 
+                            } exit:
+                            toRender[depth].push_back(&secondaries[idx-1]);
+                        }
                     }
                 }
 
@@ -645,27 +665,27 @@ namespace reporter {
                     }
                     for (size_t lineIdx = 0; lineIdx < line.size(); lineIdx++) {
                         int8_t count = 0;
-                        Diagnostic* firstFound = nullptr;
+                        Diagnostic* lastFound = nullptr;
                         for (auto curr : toRender[j])
                             if (curr->loc.start <= lineIdx && lineIdx < curr->loc.end) {
                                 count++;
-                                if (!firstFound) firstFound = curr;
+                                lastFound = curr;
                             }
-                        if (!firstFound)
+                        if (!lastFound)
                             for (auto k = j; count == 0 && k > 0; k--) {
                                 for (auto diag : toRender[k-1])
                                     if (diag->loc.start == lineIdx) {
                                         count = -1;
-                                        firstFound = diag;
+                                        lastFound = diag;
                                         break;
                                     }
                             }
-                        if (firstFound)
-                            out << firstFound->color(config)(getUnderline(config, count, line, lineIdx));
+                        if (lastFound)
+                            out << lastFound->color(config)(getUnderline(config, count, line, lineIdx));
                         else out << getUnderline(config, count, line, lineIdx);
                     }
                 }
-                
+
                 out << "\n";
                 for (; i < secondaries.size() && onSameLine(secondaries[i], first); i++) {
                     printLeft(config, out, maxLine);
