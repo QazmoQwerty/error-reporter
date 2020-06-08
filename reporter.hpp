@@ -703,7 +703,7 @@ namespace reporter {
                                 
                                 if (!b) indent(config, out, line, 1, j);
                             }
-                            out << secondaries[i].color(config)("  " + lines[idx]) << "\n";
+                            out << secondaries[i].color(config)(std::string(config.chars.lineBottomLeft.size(), ' ') + lines[idx]) << "\n";
                         }
                     }
                 }
