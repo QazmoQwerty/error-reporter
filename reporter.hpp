@@ -464,9 +464,10 @@ namespace reporter {
         }
 
         /* get corresponding underline character based intensity level */
-        static std::string getUnderline(const Config& config, uint8_t level, std::string& line, size_t idx) {
+        static std::string getUnderline(const Config& config, int8_t level, std::string& line, size_t idx) {
             std::string ret = "";
             switch (level) {
+                case -1: ret = toString(config.chars.lineVertical); break;
                 case 0:  ret = " "; break;
                 case 1:  ret = toString(config.chars.underline1); break;
                 case 2:  ret = toString(config.chars.underline2); break;
@@ -616,18 +617,55 @@ namespace reporter {
                 }
                 i++;
             } else {
-                for (size_t lineIdx = 0; lineIdx < line.size(); lineIdx++) {
-                    uint8_t count = 0;
-                    Diagnostic* firstFound = nullptr;
-                    for (auto idx = i; idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
-                        if (secondaries[idx].loc.start <= lineIdx && lineIdx < secondaries[idx].loc.end) {
-                            count++;
-                            if (!firstFound) firstFound = &secondaries[idx];
-                        }
-                    if (firstFound)
-                        out << firstFound->color(config)(getUnderline(config, count, line, lineIdx));
-                    else out << getUnderline(config, count, line, lineIdx);
+                std::vector<std::vector<Diagnostic*>> toRender;
+                uint8_t depth = 0;
+                auto idx = i;
+                while (idx < secondaries.size() && onSameLine(secondaries[idx], first))
+                    idx++;
+
+                for (; idx > i; idx--) {
+                    if (toRender.size() == 0)
+                        toRender.push_back({ &secondaries[idx-1] });
+                    else if (secondaries[idx-1].loc.start <  toRender[depth].back()->loc.end && 
+                             secondaries[idx-1].loc.end   >= toRender[depth].back()->loc.end) {
+                        if (++depth == toRender.size())
+                            toRender.push_back({});
+                        toRender[depth].push_back(&secondaries[idx-1]);
+                    } else {
+                        while (depth != 0 && secondaries[idx-1].loc.start >= toRender[depth-1].back()->loc.end)
+                            depth--;
+                        toRender[depth].push_back(&secondaries[idx-1]);
+                    }
                 }
+
+                for (size_t j = 0; j < toRender.size(); j++) {
+                    if (j != 0) {
+                        out << "\n";
+                        printLeft(config, out, maxLine);
+                    }
+                    for (size_t lineIdx = 0; lineIdx < line.size(); lineIdx++) {
+                        int8_t count = 0;
+                        Diagnostic* firstFound = nullptr;
+                        for (auto curr : toRender[j])
+                            if (curr->loc.start <= lineIdx && lineIdx < curr->loc.end) {
+                                count++;
+                                if (!firstFound) firstFound = curr;
+                            }
+                        if (!firstFound)
+                            for (auto k = j; count == 0 && k > 0; k--) {
+                                for (auto diag : toRender[k-1])
+                                    if (diag->loc.start == lineIdx) {
+                                        count = -1;
+                                        firstFound = diag;
+                                        break;
+                                    }
+                            }
+                        if (firstFound)
+                            out << firstFound->color(config)(getUnderline(config, count, line, lineIdx));
+                        else out << getUnderline(config, count, line, lineIdx);
+                    }
+                }
+                
                 out << "\n";
                 for (; i < secondaries.size() && onSameLine(secondaries[i], first); i++) {
                     printLeft(config, out, maxLine);
