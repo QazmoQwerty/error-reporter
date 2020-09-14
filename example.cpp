@@ -19,7 +19,7 @@ int main() {
         .withHelp("a help message", { 4, 30, 40, file })
 
         .withNote("relevant include in another file\n"
-                  "with another line\nand another", {26, 0, 8, file2})
+                  "with another line\nand another", {57, 0, 8, file2})
         
         .withHelp("a general help message,\nnot set to any specific location")
         .withNote("can also be a note");

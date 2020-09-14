@@ -20,8 +20,528 @@
  * SOFTWARE.
 */
 
+/*
+    This project uses "rang" to render terminal colors.
+    The following is copied directly from [https://github.com/agauniyal/rang], with one tiny modification - 
+    the enum classes rang::fg and rang::bg have an additional value (none), 
+    which is used to represent colors which don't specify specific background/foreground colors.
+*/
+
+//////////////////////////////// START OF rang.hpp ////////////////////////////////
+
+#ifndef RANG_DOT_HPP
+#define RANG_DOT_HPP
+
+#if defined(__unix__) || defined(__unix) || defined(__linux__)
+#define OS_LINUX
+#elif defined(WIN32) || defined(_WIN32) || defined(_WIN64)
+#define OS_WIN
+#elif defined(__APPLE__) || defined(__MACH__)
+#define OS_MAC
+#else
+#error Unknown Platform
+#endif
+
+#if defined(OS_LINUX) || defined(OS_MAC)
+#include <unistd.h>
+
+#elif defined(OS_WIN)
+
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x0600)
+#error                                                                         \
+  "Please include rang.hpp before any windows system headers or set _WIN32_WINNT at least to _WIN32_WINNT_VISTA"
+#elif !defined(_WIN32_WINNT)
+#define _WIN32_WINNT _WIN32_WINNT_VISTA
+#endif
+
+#include <windows.h>
+#include <io.h>
+#include <memory>
+
+// Only defined in windows 10 onwards, redefining in lower windows since it
+// doesn't gets used in lower versions
+// https://docs.microsoft.com/en-us/windows/console/getconsolemode
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+
+#endif
+
+#include <algorithm>
+#include <atomic>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+
+namespace rang {
+
+/* For better compability with most of terminals do not use any style settings
+ * except of reset, bold and reversed.
+ * Note that on Windows terminals bold style is same as fgB color.
+ */
+enum class style {
+    reset     = 0,
+    bold      = 1,
+    dim       = 2,
+    italic    = 3,
+    underline = 4,
+    blink     = 5,
+    rblink    = 6,
+    reversed  = 7,
+    conceal   = 8,
+    crossed   = 9
+};
+
+enum class fg {
+    none    = 0,
+    black   = 30,
+    red     = 31,
+    green   = 32,
+    yellow  = 33,
+    blue    = 34,
+    magenta = 35,
+    cyan    = 36,
+    gray    = 37,
+    reset   = 39
+};
+
+enum class bg {
+    none    = 0,
+    black   = 40,
+    red     = 41,
+    green   = 42,
+    yellow  = 43,
+    blue    = 44,
+    magenta = 45,
+    cyan    = 46,
+    gray    = 47,
+    reset   = 49
+};
+
+enum class fgB {
+    black   = 90,
+    red     = 91,
+    green   = 92,
+    yellow  = 93,
+    blue    = 94,
+    magenta = 95,
+    cyan    = 96,
+    gray    = 97
+};
+
+enum class bgB {
+    black   = 100,
+    red     = 101,
+    green   = 102,
+    yellow  = 103,
+    blue    = 104,
+    magenta = 105,
+    cyan    = 106,
+    gray    = 107
+};
+
+enum class control {  // Behaviour of rang function calls
+    Off   = 0,  // toggle off rang style/color calls
+    Auto  = 1,  // (Default) autodect terminal and colorize if needed
+    Force = 2  // force ansi color output to non terminal streams
+};
+// Use rang::setControlMode to set rang control mode
+
+enum class winTerm {  // Windows Terminal Mode
+    Auto   = 0,  // (Default) automatically detects wheter Ansi or Native API
+    Ansi   = 1,  // Force use Ansi API
+    Native = 2  // Force use Native API
+};
+// Use rang::setWinTermMode to explicitly set terminal API for Windows
+// Calling rang::setWinTermMode have no effect on other OS
+
+namespace rang_implementation {
+
+    inline std::atomic<control> &controlMode() noexcept
+    {
+        static std::atomic<control> value(control::Auto);
+        return value;
+    }
+
+    inline std::atomic<winTerm> &winTermMode() noexcept
+    {
+        static std::atomic<winTerm> termMode(winTerm::Auto);
+        return termMode;
+    }
+
+    inline bool supportsColor() noexcept
+    {
+#if defined(OS_LINUX) || defined(OS_MAC)
+
+        static const bool result = [] {
+            const char *Terms[]
+              = { "ansi",    "color",  "console", "cygwin", "gnome",
+                  "konsole", "kterm",  "linux",   "msys",   "putty",
+                  "rxvt",    "screen", "vt100",   "xterm" };
+
+            const char *env_p = std::getenv("TERM");
+            if (env_p == nullptr) {
+                return false;
+            }
+            return std::any_of(std::begin(Terms), std::end(Terms),
+                               [&](const char *term) {
+                                   return std::strstr(env_p, term) != nullptr;
+                               });
+        }();
+
+#elif defined(OS_WIN)
+        // All windows versions support colors through native console methods
+        static constexpr bool result = true;
+#endif
+        return result;
+    }
+
+#ifdef OS_WIN
+
+
+    inline bool isMsysPty(int fd) noexcept
+    {
+        // Dynamic load for binary compability with old Windows
+        const auto ptrGetFileInformationByHandleEx
+          = reinterpret_cast<decltype(&GetFileInformationByHandleEx)>(
+            GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")),
+                           "GetFileInformationByHandleEx"));
+        if (!ptrGetFileInformationByHandleEx) {
+            return false;
+        }
+
+        HANDLE h = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+        if (h == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+
+        // Check that it's a pipe:
+        if (GetFileType(h) != FILE_TYPE_PIPE) {
+            return false;
+        }
+
+        // POD type is binary compatible with FILE_NAME_INFO from WinBase.h
+        // It have the same alignment and used to avoid UB in caller code
+        struct MY_FILE_NAME_INFO {
+            DWORD FileNameLength;
+            WCHAR FileName[MAX_PATH];
+        };
+
+        auto pNameInfo = std::unique_ptr<MY_FILE_NAME_INFO>(
+          new (std::nothrow) MY_FILE_NAME_INFO());
+        if (!pNameInfo) {
+            return false;
+        }
+
+        // Check pipe name is template of
+        // {"cygwin-","msys-"}XXXXXXXXXXXXXXX-ptyX-XX
+        if (!ptrGetFileInformationByHandleEx(h, FileNameInfo, pNameInfo.get(),
+                                             sizeof(MY_FILE_NAME_INFO))) {
+            return false;
+        }
+        std::wstring name(pNameInfo->FileName, pNameInfo->FileNameLength / sizeof(WCHAR));
+        if ((name.find(L"msys-") == std::wstring::npos
+             && name.find(L"cygwin-") == std::wstring::npos)
+            || name.find(L"-pty") == std::wstring::npos) {
+            return false;
+        }
+
+        return true;
+    }
+
+#endif
+
+    inline bool isTerminal(const std::streambuf *osbuf) noexcept
+    {
+        using std::cerr;
+        using std::clog;
+        using std::cout;
+#if defined(OS_LINUX) || defined(OS_MAC)
+        if (osbuf == cout.rdbuf()) {
+            static const bool cout_term = isatty(fileno(stdout)) != 0;
+            return cout_term;
+        } else if (osbuf == cerr.rdbuf() || osbuf == clog.rdbuf()) {
+            static const bool cerr_term = isatty(fileno(stderr)) != 0;
+            return cerr_term;
+        }
+#elif defined(OS_WIN)
+        if (osbuf == cout.rdbuf()) {
+            static const bool cout_term
+              = (_isatty(_fileno(stdout)) || isMsysPty(_fileno(stdout)));
+            return cout_term;
+        } else if (osbuf == cerr.rdbuf() || osbuf == clog.rdbuf()) {
+            static const bool cerr_term
+              = (_isatty(_fileno(stderr)) || isMsysPty(_fileno(stderr)));
+            return cerr_term;
+        }
+#endif
+        return false;
+    }
+
+    template <typename T>
+    using enableStd = typename std::enable_if<
+      std::is_same<T, rang::style>::value || std::is_same<T, rang::fg>::value
+        || std::is_same<T, rang::bg>::value || std::is_same<T, rang::fgB>::value
+        || std::is_same<T, rang::bgB>::value,
+      std::ostream &>::type;
+
+
+#ifdef OS_WIN
+
+    struct SGR {  // Select Graphic Rendition parameters for Windows console
+        BYTE fgColor;  // foreground color (0-15) lower 3 rgb bits + intense bit
+        BYTE bgColor;  // background color (0-15) lower 3 rgb bits + intense bit
+        BYTE bold;  // emulated as FOREGROUND_INTENSITY bit
+        BYTE underline;  // emulated as BACKGROUND_INTENSITY bit
+        BOOLEAN inverse;  // swap foreground/bold & background/underline
+        BOOLEAN conceal;  // set foreground/bold to background/underline
+    };
+
+    enum class AttrColor : BYTE {  // Color attributes for console screen buffer
+        black   = 0,
+        red     = 4,
+        green   = 2,
+        yellow  = 6,
+        blue    = 1,
+        magenta = 5,
+        cyan    = 3,
+        gray    = 7
+    };
+
+    inline HANDLE getConsoleHandle(const std::streambuf *osbuf) noexcept
+    {
+        if (osbuf == std::cout.rdbuf()) {
+            static const HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+            return hStdout;
+        } else if (osbuf == std::cerr.rdbuf() || osbuf == std::clog.rdbuf()) {
+            static const HANDLE hStderr = GetStdHandle(STD_ERROR_HANDLE);
+            return hStderr;
+        }
+        return INVALID_HANDLE_VALUE;
+    }
+
+    inline bool setWinTermAnsiColors(const std::streambuf *osbuf) noexcept
+    {
+        HANDLE h = getConsoleHandle(osbuf);
+        if (h == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+        DWORD dwMode = 0;
+        if (!GetConsoleMode(h, &dwMode)) {
+            return false;
+        }
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        if (!SetConsoleMode(h, dwMode)) {
+            return false;
+        }
+        return true;
+    }
+
+    inline bool supportsAnsi(const std::streambuf *osbuf) noexcept
+    {
+        using std::cerr;
+        using std::clog;
+        using std::cout;
+        if (osbuf == cout.rdbuf()) {
+            static const bool cout_ansi
+              = (isMsysPty(_fileno(stdout)) || setWinTermAnsiColors(osbuf));
+            return cout_ansi;
+        } else if (osbuf == cerr.rdbuf() || osbuf == clog.rdbuf()) {
+            static const bool cerr_ansi
+              = (isMsysPty(_fileno(stderr)) || setWinTermAnsiColors(osbuf));
+            return cerr_ansi;
+        }
+        return false;
+    }
+
+    inline const SGR &defaultState() noexcept
+    {
+        static const SGR defaultSgr = []() -> SGR {
+            CONSOLE_SCREEN_BUFFER_INFO info;
+            WORD attrib = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+            if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE),
+                                           &info)
+                || GetConsoleScreenBufferInfo(GetStdHandle(STD_ERROR_HANDLE),
+                                              &info)) {
+                attrib = info.wAttributes;
+            }
+            SGR sgr     = { 0, 0, 0, 0, FALSE, FALSE };
+            sgr.fgColor = attrib & 0x0F;
+            sgr.bgColor = (attrib & 0xF0) >> 4;
+            return sgr;
+        }();
+        return defaultSgr;
+    }
+
+    inline BYTE ansi2attr(BYTE rgb) noexcept
+    {
+        static const AttrColor rev[8]
+          = { AttrColor::black,  AttrColor::red,  AttrColor::green,
+              AttrColor::yellow, AttrColor::blue, AttrColor::magenta,
+              AttrColor::cyan,   AttrColor::gray };
+        return static_cast<BYTE>(rev[rgb]);
+    }
+
+    inline void setWinSGR(rang::bg col, SGR &state) noexcept
+    {
+        if (col != rang::bg::reset) {
+            state.bgColor = ansi2attr(static_cast<BYTE>(col) - 40);
+        } else {
+            state.bgColor = defaultState().bgColor;
+        }
+    }
+
+    inline void setWinSGR(rang::fg col, SGR &state) noexcept
+    {
+        if (col != rang::fg::reset) {
+            state.fgColor = ansi2attr(static_cast<BYTE>(col) - 30);
+        } else {
+            state.fgColor = defaultState().fgColor;
+        }
+    }
+
+    inline void setWinSGR(rang::bgB col, SGR &state) noexcept
+    {
+        state.bgColor = (BACKGROUND_INTENSITY >> 4)
+          | ansi2attr(static_cast<BYTE>(col) - 100);
+    }
+
+    inline void setWinSGR(rang::fgB col, SGR &state) noexcept
+    {
+        state.fgColor
+          = FOREGROUND_INTENSITY | ansi2attr(static_cast<BYTE>(col) - 90);
+    }
+
+    inline void setWinSGR(rang::style style, SGR &state) noexcept
+    {
+        switch (style) {
+            case rang::style::reset: state = defaultState(); break;
+            case rang::style::bold: state.bold = FOREGROUND_INTENSITY; break;
+            case rang::style::underline:
+            case rang::style::blink:
+                state.underline = BACKGROUND_INTENSITY;
+                break;
+            case rang::style::reversed: state.inverse = TRUE; break;
+            case rang::style::conceal: state.conceal = TRUE; break;
+            default: break;
+        }
+    }
+
+    inline SGR &current_state() noexcept
+    {
+        static SGR state = defaultState();
+        return state;
+    }
+
+    inline WORD SGR2Attr(const SGR &state) noexcept
+    {
+        WORD attrib = 0;
+        if (state.conceal) {
+            if (state.inverse) {
+                attrib = (state.fgColor << 4) | state.fgColor;
+                if (state.bold)
+                    attrib |= FOREGROUND_INTENSITY | BACKGROUND_INTENSITY;
+            } else {
+                attrib = (state.bgColor << 4) | state.bgColor;
+                if (state.underline)
+                    attrib |= FOREGROUND_INTENSITY | BACKGROUND_INTENSITY;
+            }
+        } else if (state.inverse) {
+            attrib = (state.fgColor << 4) | state.bgColor;
+            if (state.bold) attrib |= BACKGROUND_INTENSITY;
+            if (state.underline) attrib |= FOREGROUND_INTENSITY;
+        } else {
+            attrib = state.fgColor | (state.bgColor << 4) | state.bold
+              | state.underline;
+        }
+        return attrib;
+    }
+
+    template <typename T>
+    inline void setWinColorAnsi(std::ostream &os, T const value)
+    {
+        os << "\033[" << static_cast<int>(value) << "m";
+    }
+
+    template <typename T>
+    inline void setWinColorNative(std::ostream &os, T const value)
+    {
+        const HANDLE h = getConsoleHandle(os.rdbuf());
+        if (h != INVALID_HANDLE_VALUE) {
+            setWinSGR(value, current_state());
+            // Out all buffered text to console with previous settings:
+            os.flush();
+            SetConsoleTextAttribute(h, SGR2Attr(current_state()));
+        }
+    }
+
+    template <typename T>
+    inline enableStd<T> setColor(std::ostream &os, T const value)
+    {
+        if (winTermMode() == winTerm::Auto) {
+            if (supportsAnsi(os.rdbuf())) {
+                setWinColorAnsi(os, value);
+            } else {
+                setWinColorNative(os, value);
+            }
+        } else if (winTermMode() == winTerm::Ansi) {
+            setWinColorAnsi(os, value);
+        } else {
+            setWinColorNative(os, value);
+        }
+        return os;
+    }
+#else
+    template <typename T>
+    inline enableStd<T> setColor(std::ostream &os, T const value)
+    {
+        return os << "\033[" << static_cast<int>(value) << "m";
+    }
+#endif
+}  // namespace rang_implementation
+
+template <typename T>
+inline rang_implementation::enableStd<T> operator<<(std::ostream &os,
+                                                    const T value)
+{
+    const control option = rang_implementation::controlMode();
+    switch (option) {
+        case control::Auto:
+            return rang_implementation::supportsColor()
+                && rang_implementation::isTerminal(os.rdbuf())
+              ? rang_implementation::setColor(os, value)
+              : os;
+        case control::Force: return rang_implementation::setColor(os, value);
+        default: return os;
+    }
+}
+
+inline void setWinTermMode(const rang::winTerm value) noexcept
+{
+    rang_implementation::winTermMode() = value;
+}
+
+inline void setControlMode(const control value) noexcept
+{
+    rang_implementation::controlMode() = value;
+}
+
+}  // namespace rang
+
+#undef OS_LINUX
+#undef OS_WIN
+#undef OS_MAC
+
+#endif /* ifndef RANG_DOT_HPP */
+
+//////////////////////////////// END OF rang.hpp ////////////////////////////////
+
 #ifndef DIAGNOSTIC_REPORTER_HPP_INCLUDED
 #define DIAGNOSTIC_REPORTER_HPP_INCLUDED
+
+// these two macros are defined accidentally by rang, but we need them undefined for our use.
+#undef max 
+#undef ERROR
 
 #include <iostream>
 #include <string>
@@ -59,13 +579,18 @@ namespace reporter {
          * @note "color" can mean both "red/green" and "bold/italic".
          */ 
         class Color {
-            uint8_t _fg; // foreground color (ansi codes 30-37)
-            uint8_t _bg; // background color (ansi codes 40-47)
+            rang::fg _fg;
+            rang::bg _bg;
+
+            // uint8_t _fg; // foreground color (ansi codes 30-37)
+            // uint8_t _bg; // background color (ansi codes 40-47)
             uint8_t _attributes;
         public:
-            Color() : _fg(0), _bg(0), _attributes(0) {}
-            Color(uint8_t fg, uint8_t bg) : _fg(fg), _bg(bg), _attributes(0) {}
-            Color(uint8_t fg, uint8_t bg, uint8_t attributes) : _fg(fg), _bg(bg), _attributes(attributes) {}
+            Color() : _fg(rang::fg::none), _bg(rang::bg::none), _attributes(0) {}
+            Color(rang::fg fg) : _fg(fg), _bg(rang::bg::none), _attributes(0) {}
+            Color(rang::bg bg) : _bg(bg), _fg(rang::fg::none), _attributes(0) {}
+            Color(rang::fg fg, rang::bg bg) : _fg(fg), _bg(bg), _attributes(0) {}
+            Color(rang::fg fg, rang::bg bg, uint8_t attributes) : _fg(fg), _bg(bg), _attributes(attributes) {}
             Color(const Color color, uint8_t attributes) : _fg(color._fg), _bg(color._bg), _attributes(color._attributes | attributes) {}
 
             /** 
@@ -87,8 +612,8 @@ namespace reporter {
              */
             Color with(const Color color) const {
                 return Color(
-                    color._fg ? color._fg : _fg,
-                    color._bg ? color._bg : _bg,
+                    color._fg != rang::fg::none ? color._fg : _fg,
+                    color._bg != rang::bg::none ? color._bg : _bg,
                     color._attributes | _attributes
                 );
             }
@@ -110,21 +635,16 @@ namespace reporter {
                        _attributes == color._attributes;
             }
 
-            /** 
-             * Colors a string using an ANSI escape sequence, to be displayed in the terminal.
-             * @param str string to be colored.
-             * @return the colored string.
-             */
-            std::string operator()(std::string str) const {
-                if (_attributes & attributes::bold)      str = "\x1B[1m" + str + "\x1B[0m";
-                if (_attributes & attributes::weak)      str = "\x1B[2m" + str + "\x1B[0m";
-                if (_attributes & attributes::italic)    str = "\x1B[3m" + str + "\x1B[0m";
-                if (_attributes & attributes::underline) str = "\x1B[4m" + str + "\x1B[0m";
-                if (_attributes & attributes::blink)     str = "\x1B[5m" + str + "\x1B[0m";
-                if (_attributes & attributes::reverse)   str = "\x1B[9m" + str + "\x1B[0m";
-                if (_fg) str = "\x1B[" + std::to_string(_fg) + "m" + str + "\x1B[0m";
-                if (_bg) str = "\x1B[" + std::to_string(_bg) + "m" + str + "\x1B[0m";
-                return str;
+            void print(std::ostream& out, std::string str) const {
+                if (_attributes & attributes::bold)      out << rang::style::bold;
+                if (_attributes & attributes::weak)      out << rang::style::dim;
+                if (_attributes & attributes::italic)    out << rang::style::italic;
+                if (_attributes & attributes::underline) out << rang::style::underline;
+                if (_attributes & attributes::blink)     out << rang::style::blink;
+                if (_attributes & attributes::reverse)   out << rang::style::reversed;
+                if (_fg != rang::fg::none) out << _fg;
+                if (_bg != rang::bg::none) out << _bg;
+                out << str << rang::style::reset;
             }
         };
 
@@ -137,23 +657,23 @@ namespace reporter {
         const Color blink     = none & attributes::blink;
         const Color reverse   = none & attributes::reverse;
 
-        const Color fgblack   (30, 0);
-        const Color fgred     (31, 0);
-        const Color fggreen   (32, 0);
-        const Color fgyellow  (33, 0);
-        const Color fgblue    (34, 0);
-        const Color fgmagenta (35, 0);
-        const Color fgcyan    (36, 0);
-        const Color fgwhite   (37, 0);
+        const Color fgblack   (rang::fg::black);
+        const Color fgred     (rang::fg::red);
+        const Color fggreen   (rang::fg::green);
+        const Color fgyellow  (rang::fg::yellow);
+        const Color fgblue    (rang::fg::blue);
+        const Color fgmagenta (rang::fg::magenta);
+        const Color fgcyan    (rang::fg::cyan);
+        const Color fgwhite   (rang::fg::reset);
 
-        const Color bgblack   (0, 40);
-        const Color bgred     (0, 41);
-        const Color bggreen   (0, 42);
-        const Color bgyellow  (0, 43);
-        const Color bgblue    (0, 44);
-        const Color bgmagenta (0, 45);
-        const Color bgcyan    (0, 46);
-        const Color bgwhite   (0, 47);
+        const Color bgblack   (rang::bg::black);
+        const Color bgred     (rang::bg::red);
+        const Color bggreen   (rang::bg::green);
+        const Color bgyellow  (rang::bg::yellow);
+        const Color bgblue    (rang::bg::blue);
+        const Color bgmagenta (rang::bg::magenta);
+        const Color bgcyan    (rang::bg::cyan);
+        const Color bgwhite   (rang::bg::reset);
     }
 
     /////////////////////////////////////////////////////////////////////////
@@ -386,6 +906,27 @@ namespace reporter {
         std::string code;
         std::vector<Diagnostic> secondaries;
 
+        /* count number of utf8 characters in a string, if invalid character is found returns std::string::npos. */
+        static size_t countChars(std::string str) {
+            #define MSB (1 << 7)
+            size_t sum = 0;
+            for (size_t i = 0; i < str.size(); i++) {
+                char c = str[i];
+                if (c & MSB) {
+                    c <<= 1;
+                    if ((c & MSB) == 0)
+                        return std::string::npos;
+                    do {
+                        i++;
+                        c <<= 1;
+                    } while (c & MSB);
+                }
+                sum++;
+            }
+            return sum;
+            #undef MSB
+        }
+
         /* unicode code point to string */
         static std::string toString(char32_t cp)
         {
@@ -543,14 +1084,16 @@ namespace reporter {
         void printLeft(const Config& config, std::ostream& out, uint32_t maxLine, bool printBar = true) {
             out << std::string(std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum, ' ');
             if (printBar)
-                out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
+                maybeInherit(config, config.colors.border).print(out, toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
         }
 
         /* prints the `╭─ file.xyz ─╴` at the start of the file's diagnostics */
         void printTop(const Config& config, std::ostream& out, SourceFile* file, uint32_t maxLine) {
             printLeft(config, out, maxLine, false);
-            out << maybeInherit(config, config.colors.border)(config.chars.beforeFileName) 
-                << file->str() << maybeInherit(config, config.colors.border)(config.chars.afterFileName) << "\n";
+            maybeInherit(config, config.colors.border).print(out, config.chars.beforeFileName); 
+            out << file->str();
+            maybeInherit(config, config.colors.border).print(out, config.chars.afterFileName);
+            out << "\n";
         }
 
         /* prints the border at the end of the file's diagnostics */
@@ -560,8 +1103,9 @@ namespace reporter {
                 out << "\n";
             }
             for (size_t i = 0; i < std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum; i++)
-                out << maybeInherit(config, config.colors.border)(toString(config.chars.borderHorizontal));
-            out << maybeInherit(config, config.colors.border)(toString(config.chars.borderBottomRight)) << "\n";
+                maybeInherit(config, config.colors.border).print(out, toString(config.chars.borderHorizontal));
+            maybeInherit(config, config.colors.border).print(out, toString(config.chars.borderBottomRight));
+            out << "\n";
         }
 
         /* prints the bars on the left with the correct indentation + with the line number */
@@ -571,10 +1115,10 @@ namespace reporter {
             while (str.size() < targetSize)
                 str += " ";
             if (lineNum == loc.line)
-                out << maybeInherit(config, config.colors.highlightLineNum)(str);
-            else out << maybeInherit(config, config.colors.lineNum)(str);
+                maybeInherit(config, config.colors.highlightLineNum).print(out, str);
+            else maybeInherit(config, config.colors.lineNum).print(out, str);
             if (printBar)
-                    out << maybeInherit(config, config.colors.border)(toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
+                    maybeInherit(config, config.colors.border).print(out, toString(config.chars.borderVertical) + std::string(config.padding.borderLeft, ' '));
         }
 
         /* a 'padding' line is an irrelevant line in between two other relevant lines */
@@ -583,11 +1127,13 @@ namespace reporter {
                 printLeftWithLineNum(config, out, currLine - 1, maxLine);
                 out << file->getLine(currLine - 1) << "\n";
             } else {
+                out << " ";
                 switch (std::to_string(maxLine).size() + config.padding.beforeLineNum + config.padding.afterLineNum) {
-                    case 3:  out << " " << color(config)("⋯") << "\n"; break;
-                    case 4:  out << " " << color(config)("··") << "\n"; break;
-                    default: out << " " << color(config)("···") << "\n"; break;
-                }   
+                    case 3:  color(config).print(out, "⋯"); break;
+                    case 4:  color(config).print(out, "··"); break;
+                    default: color(config).print(out, "···"); break;
+                }
+                out << "\n";
             }
         }
 
@@ -601,19 +1147,31 @@ namespace reporter {
                 // only one secondary concerning this line
                 indent(config, out, line, first.loc.start);
                 for (auto idx = first.loc.start; idx < first.loc.end; idx++)
-                    out << first.color(config)(getUnderline(config, 1, line, idx));
+                    first.color(config).print(out, getUnderline(config, 1, line, idx));
 
                 auto lines = splitLines(first.msg);
-                for (auto& sec : first.secondaries)
-                    for (auto str : splitLines(sec.msg))
-                        lines.push_back(sec.color(config)(str));
                 
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
                         printLeft(config, out, maxLine);
                         indent(config, out, line, first.loc.end);
                     }
-                    out << " " << first.color(config)(lines[idx]) << "\n";
+                    out << " ";
+                    first.color(config).print(out, lines[idx]);
+                    out << "\n";
+                }
+
+                for (auto& sec : first.secondaries) {
+                    lines = splitLines(sec.msg);
+                    for (size_t idx = 0; idx < lines.size(); idx++) {
+                        if (first.msg != "" || idx != 0) {
+                            printLeft(config, out, maxLine);
+                            indent(config, out, line, sec.loc.end);
+                        }
+                        out << " ";
+                        sec.color(config).print(out, lines[idx]);
+                        out << "\n";
+                    }
                 }
                 i++;
             } else {
@@ -681,7 +1239,7 @@ namespace reporter {
                                     }
                             }
                         if (lastFound)
-                            out << lastFound->color(config)(getUnderline(config, count, line, lineIdx));
+                            lastFound->color(config).print(out, getUnderline(config, count, line, lineIdx));
                         else out << getUnderline(config, count, line, lineIdx);
                     }
                 }
@@ -693,7 +1251,7 @@ namespace reporter {
                         bool b = false;
                         for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
                             if (secondaries[idx].loc.start == j) {
-                                out << secondaries[idx].color(config)(toString(config.chars.lineVertical));
+                                secondaries[idx].color(config).print(out, toString(config.chars.lineVertical));
                                 if (line[j] == '\t' && tabWidth(config, j) > 1)
                                     out << std::string(tabWidth(config, j) - 1, ' ');
                                 b = true;
@@ -701,21 +1259,18 @@ namespace reporter {
                         if (!b) indent(config, out, line, 1, j);
                     }
                     auto lines = splitLines(secondaries[i].msg);
-                    for (auto& sec : secondaries[i].secondaries)
-                        for (auto str : splitLines(sec.msg))
-                            lines.push_back(sec.color(config)(str));
 
                     for (size_t idx = 0; idx < lines.size(); idx++) {
-                        if (idx == 0)
-                            out << secondaries[i].color(config)(config.chars.lineBottomLeft + lines[idx]) << "\n";
-                        else {
+                        if (idx == 0) {
+                            secondaries[i].color(config).print(out, config.chars.lineBottomLeft + lines[idx]);
+                            out << "\n";
+                        } else {
                             printLeft(config, out, maxLine);
                             for (size_t j = 0; j < secondaries[i].loc.start; j++) {
                                 bool b = false;
-
                                 for (auto k = i; !b && k < secondaries.size() && onSameLine(secondaries[k], first); k++)
                                     if (secondaries[k].loc.start == j) {
-                                        out << secondaries[k].color(config)(toString(config.chars.lineVertical));
+                                        secondaries[k].color(config).print(out, toString(config.chars.lineVertical));
                                         if (line[j] == '\t' && tabWidth(config, j) > 1)
                                             out << std::string(tabWidth(config, j) - 1, ' ');
                                         b = true;
@@ -723,7 +1278,36 @@ namespace reporter {
                                 
                                 if (!b) indent(config, out, line, 1, j);
                             }
-                            out << secondaries[i].color(config)(std::string(config.chars.lineBottomLeft.size(), ' ') + lines[idx]) << "\n";
+                            secondaries[i].color(config).print(out, std::string(countChars(config.chars.lineBottomLeft), ' ') + lines[idx]);
+                            out << "\n";
+                        }
+                    }
+
+                    for (auto& sec : secondaries[i].secondaries) {
+                        lines = splitLines(sec.msg);
+
+                        for (size_t idx = 0; idx < lines.size(); idx++) {
+                            if (secondaries[i].msg == "" && idx == 0) {
+                                secondaries[i].color(config).print(out, config.chars.lineBottomLeft);
+                                sec.color(config).print(out, lines[idx]);
+                                out << "\n";
+                            } else {
+                                printLeft(config, out, maxLine);
+                                for (size_t j = 0; j < sec.loc.start; j++) {
+                                    bool b = false;
+                                    for (auto k = i; !b && k < secondaries.size() && onSameLine(secondaries[k], first); k++)
+                                        if (secondaries[k].loc.start == j) {
+                                            secondaries[k].color(config).print(out, toString(config.chars.lineVertical));
+                                            if (line[j] == '\t' && tabWidth(config, j) > 1)
+                                                out << std::string(tabWidth(config, j) - 1, ' ');
+                                            b = true;
+                                        }
+                                    
+                                    if (!b) indent(config, out, line, 1, j);
+                                }
+                                sec.color(config).print(out, std::string(countChars(config.chars.lineBottomLeft), ' ') + lines[idx]);
+                                out << "\n";
+                            }
                         }
                     }
                 }
@@ -751,14 +1335,15 @@ namespace reporter {
             if (config.style == DisplayStyle::SHORT) {
                 if (loc.file)
                     out << loc.file->str() << ":" << loc.line << ":" << loc.start << ":" << loc.end << ": ";
-                out << color(config)(tyToString(config) + ": ") 
-                    << maybeInherit(config, config.colors.message)(replaceAll(msg, "\n", config.chars.shortModeLineSeperator)) << "\n";
+                color(config).print(out, tyToString(config) + ": ");
+                maybeInherit(config, config.colors.message).print(out, replaceAll(msg, "\n", config.chars.shortModeLineSeperator));
+                out << "\n";
                 for (auto& i : secondaries)
                 {
                     if (i.loc.file) 
                         out << i.loc.file->str() << ":" << i.loc.line << ":" << i.loc.start << ":" << i.loc.end << ": ";
-                    out << i.color(config)(i.tyToString(config) + ": ") 
-                        << replaceAll(i.msg, "\n", config.chars.shortModeLineSeperator) << "\n";
+                    i.color(config).print(out, i.tyToString(config) + ": ");
+                    out << replaceAll(i.msg, "\n", config.chars.shortModeLineSeperator) << "\n";
                 }
                 return *this;
             }
@@ -780,8 +1365,11 @@ namespace reporter {
                 }
 
             // print the main error message
-            if (msg != "")
-                out << color(config)(tyToString(config) + ": ") << maybeInherit(config, config.colors.message)(msg) << "\n";
+            if (msg != "") {
+                color(config).print(out, tyToString(config) + ": ");
+                maybeInherit(config, config.colors.message).print(out, msg);
+                out << "\n";
+            }
 
             size_t i = 0; // current index in `secondaries`
             uint32_t lastLine = 0; // the last line we rendered
@@ -830,7 +1418,8 @@ namespace reporter {
                     for (auto currLine : splitLines(subMsg)) {
                         printLeft(config, out, maxLine);
                         indent(config, out, line, loc.start);
-                        out << color(config)(currLine) << "\n";
+                        color(config).print(out, currLine);
+                        out << "\n";
                     }
                 }
                 
@@ -839,8 +1428,8 @@ namespace reporter {
                 indent(config, out, line, loc.start);
                 for (auto j = loc.start; j < loc.end; j++)
                     if (line[j] == '\t')
-                        out << color(config)(repeat(toString(config.chars.arrowDown), tabWidth(config, j)));
-                    else out << color(config)(toString(config.chars.arrowDown));
+                        color(config).print(out, repeat(toString(config.chars.arrowDown), tabWidth(config, j)));
+                    else color(config).print(out, toString(config.chars.arrowDown));
                 out << "\n";
             }
             
@@ -852,8 +1441,8 @@ namespace reporter {
                 indent(config, out, line, loc.start);
                 for (auto j = loc.start; j < loc.end; j++)
                     if (line[j] == '\t')
-                        out << color(config)(repeat(toString(config.chars.arrowUp), tabWidth(config, j)));
-                    else out << color(config)(toString(config.chars.arrowUp));
+                        color(config).print(out, repeat(toString(config.chars.arrowUp), tabWidth(config, j)));
+                    else color(config).print(out, toString(config.chars.arrowUp));
                 if (subMsg == "")
                     out << "\n";
                 else {
@@ -862,9 +1451,10 @@ namespace reporter {
                         if (k) {
                             printLeft(config, out, maxLine);
                             indent(config, out, line, loc.end);
-                            // out << std::string(loc.end - loc.start, ' ');
                         }
-                        out << " " << color(config)(split[k]) << "\n";
+                        out << " ";
+                        color(config).print(out, split[k]);
+                        out << "\n";
                     }
                 }
                 for (size_t j = i; j < secondaries.size() && secondaries[j].loc.file == loc.file && secondaries[j].loc.line == loc.line; j++) {
@@ -872,7 +1462,9 @@ namespace reporter {
                         for (auto str : splitLines(secondaries[j].msg)) {
                             printLeft(config, out, maxLine);
                             indent(config, out, line, loc.end);
-                            out << " " << secondaries[j].color(config)(str) << "\n";    
+                            out << " ";
+                            secondaries[j].color(config).print(out, str);
+                            out << "\n";
                         }
                     }
                 }
@@ -908,17 +1500,14 @@ namespace reporter {
             for (; i < secondaries.size(); i++) {
                 auto& secondary = secondaries[i];
                 printLeft(config, out, maxLine, false);
-                out << secondary.color(config)(toString(config.chars.noteBullet) + " " + secondary.tyToString(config) + secondary.color(config)(": "));
+                secondary.color(config).print(out, toString(config.chars.noteBullet) + " " + secondary.tyToString(config) + ": ");
 
                 auto lines = splitLines(secondary.msg);
-                for (auto& sec : secondary.secondaries)
-                    for (auto str : splitLines(sec.msg))
-                        lines.push_back(sec.color(config)(str));
                 
                 for (size_t idx = 0; idx < lines.size(); idx++) {
                     if (idx != 0) {
                         printLeft(config, out, maxLine, false);
-                        out << std::string(secondary.tyToString(config).size() + 4, ' ');
+                        out << std::string(countChars(secondary.tyToString(config)) + 4, ' ');
                     }
                     printLine(config, out, lines[idx]);
                 }
