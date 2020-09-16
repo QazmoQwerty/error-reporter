@@ -54,7 +54,7 @@
 #define _WIN32_WINNT _WIN32_WINNT_VISTA
 #endif
 
-#include <windows.h>
+#include <Windows.h>
 #include <io.h>
 #include <memory>
 
@@ -588,7 +588,7 @@ namespace reporter {
         public:
             Color() : _fg(rang::fg::none), _bg(rang::bg::none), _attributes(0) {}
             Color(rang::fg fg) : _fg(fg), _bg(rang::bg::none), _attributes(0) {}
-            Color(rang::bg bg) : _bg(bg), _fg(rang::fg::none), _attributes(0) {}
+            Color(rang::bg bg) : _fg(rang::fg::none), _bg(bg), _attributes(0) {}
             Color(rang::fg fg, rang::bg bg) : _fg(fg), _bg(bg), _attributes(0) {}
             Color(rang::fg fg, rang::bg bg, uint8_t attributes) : _fg(fg), _bg(bg), _attributes(attributes) {}
             Color(const Color color, uint8_t attributes) : _fg(color._fg), _bg(color._bg), _attributes(color._attributes | attributes) {}
@@ -1177,11 +1177,11 @@ namespace reporter {
             } else {
                 std::vector<std::vector<Diagnostic*>> toRender;
                 uint8_t depth = 0;
-                auto idx = i;
-                while (idx < secondaries.size() && onSameLine(secondaries[idx], first))
-                    idx++;
+                size_t index = i;
+                while (index < secondaries.size() && onSameLine(secondaries[index], first))
+                    index++;
 
-                for (; idx > i; idx--) {
+                for (size_t idx = index; idx > i; idx--) {
                     if (toRender.size() == 0)
                         toRender.push_back({ &secondaries[idx-1] });
                     else {
@@ -1249,7 +1249,7 @@ namespace reporter {
                     printLeft(config, out, maxLine);
                     for (size_t j = 0; j < secondaries[i].loc.start; j++) {
                         bool b = false;
-                        for (auto idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
+                        for (size_t idx = i; !b && idx < secondaries.size() && onSameLine(secondaries[idx], first); idx++)
                             if (secondaries[idx].loc.start == j) {
                                 secondaries[idx].color(config).print(out, toString(config.chars.lineVertical));
                                 if (line[j] == '\t' && tabWidth(config, j) > 1)
