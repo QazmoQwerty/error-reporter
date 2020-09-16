@@ -27,7 +27,11 @@
     which is used to represent colors which don't specify specific background/foreground colors.
 */
 
+///////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// START OF rang.hpp ////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef RANG_DOT_HPP
 #define RANG_DOT_HPP
@@ -49,7 +53,7 @@
 
 #if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x0600)
 #error                                                                         \
-  "Please include rang.hpp before any windows system headers or set _WIN32_WINNT at least to _WIN32_WINNT_VISTA"
+  "Please include reporter.hpp before any windows system headers or set _WIN32_WINNT at least to _WIN32_WINNT_VISTA"
 #elif !defined(_WIN32_WINNT)
 #define _WIN32_WINNT _WIN32_WINNT_VISTA
 #endif
@@ -534,7 +538,11 @@ inline void setControlMode(const control value) noexcept
 
 #endif /* ifndef RANG_DOT_HPP */
 
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// END OF rang.hpp ////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 #ifndef DIAGNOSTIC_REPORTER_HPP_INCLUDED
 #define DIAGNOSTIC_REPORTER_HPP_INCLUDED
@@ -724,7 +732,7 @@ namespace reporter {
     /////////////////////////////////////////////////////////////////////////
 
     /**
-     * TODO - explain
+     * The different types of possible diagnostics, essentially just controls the outputted message's color
      */
     enum class DiagnosticType {
         INTERNAL_ERROR,
@@ -797,12 +805,19 @@ namespace reporter {
     enum class DisplayStyle { RICH, SHORT };
 
     /**
-     * TODO - explain
+     * You can customize most aspects of the display settings such as color, padding, used characters, etc.
+     * Simply create a Config object, change the values to your liking, and pass them to the print() function.
      */
     class Config {
     public:
+
+        /* Contrls whether the diagnostics are displayed in RICH or SHORT mode, default is RICH */
         DisplayStyle style;
+
+        /* Number of spaces to render per tab */
         uint32_t tabWidth;
+
+        /* The colors to be displayed for each type of diagnostic, as well as some general color settings */
         struct {
             colors::Color error = colors::fgred & colors::bold;
             colors::Color warning = colors::fgyellow & colors::bold;
@@ -814,6 +829,7 @@ namespace reporter {
             colors::Color highlightLineNum = colors::inherit;
         } colors;
 
+        /* padding is empty space which is added to make the diagnostics more readable */
         struct {
             /*
                     ╭─ file.xyz ─
@@ -837,6 +853,10 @@ namespace reporter {
             uint8_t borderBottom = 0;
         } padding;
 
+        /** 
+         * Controls all the characters which are to be rendered. 
+         * Note: some of these are stored as strings, while others are stored as single characters.
+         */
         struct {
             std::string errorName = "Error";
             std::string warningName = "Warning";
@@ -1562,9 +1582,6 @@ namespace reporter {
 
     /////////////////////////////////////////////////////////////////////////
 
-    /**
-     * TODO - explain
-     */
     template<DiagnosticType T>
     class DiagnosticTy : public Diagnostic {
     public:
